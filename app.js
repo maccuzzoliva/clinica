@@ -495,10 +495,9 @@ function waLink(a) {
   const pz = S.pazienti.find(x => x.id === a.paziente_id) || {};
   let n = String(pz.telefono || '').replace(/[^\d+]/g, '');
   if (n.startsWith('00')) n = n.slice(2); else if (n.startsWith('+')) n = n.slice(1); else if (n) n = '39' + n.replace(/^0+(?=3)/, '');
-  const d = new Date(a.inizio), t0 = new Date(); t0.setHours(0, 0, 0, 0);
-  const gg = Math.round((new Date(d).setHours(0, 0, 0, 0) - t0) / 86400000);
-  const quando = gg === 0 ? 'di oggi' : gg === 1 ? 'di domani' : 'del ' + d.toLocaleDateString('it-IT');
-  const testo = `Buongiorno ${pz.nome || ''}, le ricordiamo il suo appuntamento ${quando} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}. Per conferme o spostamenti risponda a questo messaggio.`;
+  const d = new Date(a.inizio);
+  const saluto = new Date().getHours() < 17 ? 'Buongiorno' : 'Buonasera';
+  const testo = `${saluto} ${pz.nome || ''}, le confermiamo l'appuntamento del ${d.toLocaleDateString('it-IT')} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.\n\nSTUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA`;
   return n ? `https://wa.me/${n}?text=${encodeURIComponent(testo)}` : '';
 }
 function scaricaIcs(a) {
@@ -532,7 +531,7 @@ VISTE.app = async (id, pazPre = '') => {
       ${nuovo ? '' : `<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
       <button type="button" class="b o" id="ics">Apple / altri (.ics)</button></div>
       <h3>Promemoria paziente</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">Invia promemoria WhatsApp</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}
-      <p class="m">Nel calendario compaiono nome, cognome e tipo di appuntamento.</p>`}`
+      <p class="m">Nel calendario compaiono nome e cognome, tipo e trattamento.</p>`}`
   });
   $('#dl').onchange = e => { const l = S.listino.find(x => x.id === e.target.value); if (l) { $('#trt').value = l.nome; $('#f [name=durata_min]').value = l.durata_min; } };
   $('#f').onsubmit = e => {
