@@ -162,16 +162,20 @@ window.addEventListener('hashchange', () => { chiudi(); render(); });
 VISTE.pazienti = async () => {
   schermo({
     titolo: 'Pazienti', nav: 'pazienti',
-    body: `<input id="cerca" type="search" placeholder="Cerca per nome o telefono" style="margin:0 0 6px"><div class="list" id="lista"></div>
+    body: `<input id="cerca" type="search" placeholder="Cerca per nome o telefono" style="margin:0 0 6px">
+      <div class="chips" style="margin:0 0 6px"><label><input type="radio" name="ord" value="alfa" checked>Alfabetico</label><label><input type="radio" name="ord" value="ins">Ordine di inserimento</label></div><div class="list" id="lista"></div>
       ${can('pazienti', true) ? '<button class="fab" id="nuovo" aria-label="Nuovo paziente">+</button>' : ''}`
   });
   const disegna = () => {
     const t = $('#cerca').value.trim().toLowerCase();
-    const l = S.pazienti.filter(p => !t || `${p.cognome} ${p.nome} ${p.telefono || ''}`.toLowerCase().includes(t));
+    const ins = document.querySelector('input[name=ord]:checked').value === 'ins';
+    const l = S.pazienti.filter(p => !t || `${p.cognome} ${p.nome} ${p.telefono || ''}`.toLowerCase().includes(t))
+      .sort(ins ? (a, b) => String(b.creato_il || '').localeCompare(String(a.creato_il || '')) : (a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`, 'it'));
     $('#lista').innerHTML = l.length ? l.map(p => `<a class="it" href="#/paziente/${p.id}"><b>${esc(p.cognome)} ${esc(p.nome)}</b><br><small>${esc(p.telefono || '')}</small></a>`).join('')
       : '<p class="m">Nessun paziente</p>';
   };
-  $('#cerca').oninput = disegna; disegna();
+  $('#cerca').oninput = disegna;
+  document.querySelectorAll('input[name=ord]').forEach(r => r.onchange = disegna); disegna();
   if ($('#nuovo')) $('#nuovo').onclick = () => go('#/pform/new');
 };
 
@@ -186,6 +190,9 @@ VISTE.pform = async id => {
       <label class="f">Sesso${scelta('sesso', ['F', 'M', 'Altro'], p.sesso || '')}</label>
       ${campo('Codice fiscale', 'codice_fiscale', p.codice_fiscale, 'text', 'autocapitalize="characters"')}
       ${campo('Telefono', 'telefono', p.telefono, 'tel')}${campo('Email', 'email', p.email, 'email')}${campo('Indirizzo', 'indirizzo', p.indirizzo)}
+      <div class="f" style="margin-top:12px">Medico</div>
+      <label class="chk" style="margin:6px 0"><input type="checkbox" name="m_delia" ${(p.medici || '').includes('Prof. Delia') ? 'checked' : ''}>Prof. Delia</label>
+      <label class="chk" style="margin:6px 0"><input type="checkbox" name="m_micieli" ${(p.medici || '').includes('Dott. Micieli') ? 'checked' : ''}>Dott. Micieli</label>
       <label class="chk"><input type="checkbox" name="consenso_privacy" ${p.consenso_privacy ? 'checked' : ''}>Informativa privacy (GDPR) firmata</label>
       <label class="chk"><input type="checkbox" name="consenso_informato" ${p.consenso_informato ? 'checked' : ''}>Consenso informato firmato</label>
       ${campo('Data del consenso', 'consenso_data', p.consenso_data || '', 'date')}
@@ -197,7 +204,8 @@ VISTE.pform = async id => {
     const rec = {
       nome: d.nome.trim(), cognome: d.cognome.trim(), data_nascita: d.data_nascita || null, sesso: d.sesso || '',
       codice_fiscale: (d.codice_fiscale || '').trim().toUpperCase(), telefono: (d.telefono || '').trim(), email: (d.email || '').trim(),
-      indirizzo: (d.indirizzo || '').trim(), consenso_privacy: !!d.consenso_privacy, consenso_informato: !!d.consenso_informato,
+      indirizzo: (d.indirizzo || '').trim(), medici: [d.m_delia ? 'Prof. Delia' : '', d.m_micieli ? 'Dott. Micieli' : ''].filter(Boolean).join(', '),
+      consenso_privacy: !!d.consenso_privacy, consenso_informato: !!d.consenso_informato,
       consenso_data: d.consenso_informato ? (d.consenso_data || oggiISO()) : (d.consenso_data || null)
     };
     ok(async () => {
@@ -230,6 +238,7 @@ VISTE.paziente = async (id, tab = 'scheda') => {
 function tabScheda(pz) {
   $('#tc').innerHTML = `${kv('Data di nascita', esc(fData(pz.data_nascita)))}${kv('Sesso', esc(pz.sesso))}${kv('Codice fiscale', esc(pz.codice_fiscale))}
     ${kv('Telefono', pz.telefono ? `<a href="tel:${esc(pz.telefono)}">${esc(pz.telefono)}</a>` : '')}${kv('Email', esc(pz.email))}${kv('Indirizzo', esc(pz.indirizzo))}
+    ${kv('Medico', esc(pz.medici))}
     ${kv('Privacy (GDPR)', pz.consenso_privacy ? 'Informativa firmata' : '<span class="warn">NON firmata</span>')}
     ${kv('Consenso informato', pz.consenso_informato ? 'Firmato il ' + esc(fData(pz.consenso_data)) : '<span class="warn">NON firmato</span>')}
     <div class="row">
@@ -257,7 +266,9 @@ async function tabClinica(pz) {
   const a = an[0] || {};
   const dis = mod ? '' : 'disabled';
   $('#tc').innerHTML = `<h3 style="margin-top:0">Anamnesi</h3>
-    <form id="fa">${area('Allergie', 'allergie', a.allergie).replace('<textarea', `<textarea ${dis}`)}
+    <form id="fa">${area('Diagnosi', 'diagnosi', a.diagnosi).replace('<textarea', `<textarea ${dis}`)}
+      ${area('Tipologia di intervento', 'tipo_intervento', a.tipo_intervento).replace('<textarea', `<textarea ${dis}`)}
+      ${area('Allergie', 'allergie', a.allergie).replace('<textarea', `<textarea ${dis}`)}
       ${area('Farmaci in corso', 'farmaci', a.farmaci).replace('<textarea', `<textarea ${dis}`)}
       ${area('Patologie', 'patologie', a.patologie).replace('<textarea', `<textarea ${dis}`)}
       <label class="f">Fumo${scelta('fumatore', ['No', 'Ex', 'Sì'], a.fumatore || '')}</label>
@@ -271,7 +282,7 @@ async function tabClinica(pz) {
     $('#fa').onsubmit = e => {
       e.preventDefault(); const d = fobj(e.target);
       ok(async () => {
-        await q(sb.from('anamnesi').upsert({ paziente_id: id, allergie: d.allergie.trim(), farmaci: d.farmaci.trim(), patologie: d.patologie.trim(), fumatore: d.fumatore || '' }, { onConflict: 'paziente_id' }));
+        await q(sb.from('anamnesi').upsert({ paziente_id: id, diagnosi: d.diagnosi.trim(), tipo_intervento: d.tipo_intervento.trim(), allergie: d.allergie.trim(), farmaci: d.farmaci.trim(), patologie: d.patologie.trim(), fumatore: d.fumatore || '' }, { onConflict: 'paziente_id' }));
         log('modifica_anamnesi', id); avviso('Fatto', 'Anamnesi salvata.');
       });
     };
@@ -385,6 +396,7 @@ async function tabConti(pz) {
       <div class="m">${esc(fData(p.creato_il))} · ${esc(p.stato)}</div><b>${euro(totPrev(p))}</b><div>${esc((p.voci || []).map(v => v.nome).join(', '))}</div></a>`).join('') : '<p class="m">Nessun preventivo</p>'}
     <h3>Pagamenti</h3>
     ${mod ? `<form id="fp">${campo('Importo (€)', 'importo', '', 'text', 'inputmode="decimal" required')}
+      ${campo('Data del pagamento', 'data', oggiISO(), 'date', 'required')}
       <label class="f">Metodo${scelta('metodo', ['Contanti', 'Carta', 'Bonifico', 'Altro'], 'Contanti')}</label>${campo('Nota', 'nota')}
       <div class="row"><button class="b">Registra pagamento</button></div></form>` : ''}
     ${pag.length ? pag.map(p => `<div class="kv"><span><span class="m">${esc(fData(p.creato_il))} · ${esc(p.metodo)}</span><br>${euro(p.importo)}${p.nota ? `<br><small class="m">${esc(p.nota)}</small>` : ''}</span>
@@ -393,7 +405,7 @@ async function tabConti(pz) {
     e.preventDefault(); const d = fobj(e.target), v = num(d.importo);
     if (v <= 0) return avviso('Attenzione', 'Inserisci un importo maggiore di zero.');
     ok(async () => {
-      await q(sb.from('pagamenti').insert({ paziente_id: id, importo: v, metodo: d.metodo || 'Contanti', nota: (d.nota || '').trim() }));
+      await q(sb.from('pagamenti').insert({ paziente_id: id, importo: v, metodo: d.metodo || 'Contanti', nota: (d.nota || '').trim(), creato_il: new Date(`${d.data || oggiISO()}T12:00:00`).toISOString() }));
       log('pagamento', id); await tabConti(pz);
     });
   };
@@ -658,13 +670,13 @@ async function stampa(id) {
   h.push(`<h1>Scheda paziente</h1><h2>${esc(pz.cognome)} ${esc(pz.nome)}</h2>
     <p class="s">Stampata il ${new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })} da ${esc(me.nome || me.username)}</p>`);
   const r = (e, v) => v ? `<tr><td class="e">${esc(e)}</td><td>${esc(v)}</td></tr>` : '';
-  h.push(`<h3>Anagrafica</h3><table>${r('Data di nascita', fData(pz.data_nascita))}${r('Sesso', pz.sesso)}${r('Codice fiscale', pz.codice_fiscale)}${r('Telefono', pz.telefono)}
+  h.push(`<h3>Anagrafica</h3><table>${r('Data di nascita', fData(pz.data_nascita))}${r('Sesso', pz.sesso)}${r('Codice fiscale', pz.codice_fiscale)}${r('Telefono', pz.telefono)}${r('Medico', pz.medici)}
     ${r('Email', pz.email)}${r('Indirizzo', pz.indirizzo)}${r('Privacy (GDPR)', pz.consenso_privacy ? 'Informativa firmata' : 'NON firmata')}
     ${r('Consenso informato', pz.consenso_informato ? 'Firmato il ' + fData(pz.consenso_data) : 'NON firmato')}</table>`);
   if (can('clinica')) {
     const [an, note] = await Promise.all([q(sb.from('anamnesi').select('*').eq('paziente_id', id)), q(sb.from('note_cliniche').select('*').eq('paziente_id', id).order('creato_il', { ascending: false }))]);
     const a = an[0];
-    h.push(`<h3>Anamnesi</h3><table>${a ? r('Allergie', a.allergie) + r('Farmaci in corso', a.farmaci) + r('Patologie', a.patologie) + r('Fumo', a.fumatore) : '<tr><td>Nessuna anamnesi registrata</td></tr>'}</table><h3>Note cliniche</h3>`);
+    h.push(`<h3>Anamnesi</h3><table>${a ? r('Diagnosi', a.diagnosi) + r('Tipologia di intervento', a.tipo_intervento) + r('Allergie', a.allergie) + r('Farmaci in corso', a.farmaci) + r('Patologie', a.patologie) + r('Fumo', a.fumatore) : '<tr><td>Nessuna anamnesi registrata</td></tr>'}</table><h3>Note cliniche</h3>`);
     h.push(note.length ? note.map(n => `<div class="n"><div class="s">${esc(fDataOra(n.creato_il))} · ${esc(n.autore_nome)}</div>${esc(n.testo).replace(/\n/g, '<br>')}</div>`).join('') : '<p>Nessuna nota</p>');
   }
   if (can('agenda')) {
