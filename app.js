@@ -480,7 +480,7 @@ const utcStamp = d => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.
 function datiCal(a) {
   const fine = new Date(new Date(a.inizio).getTime() + (a.durata_min || 30) * 60000);
   return {
-    titolo: `${a.tipo || 'Appuntamento'} - ${iniziali(a.paziente_id)}`,
+    titolo: `${nomePaz(a.paziente_id)} - ${a.tipo || 'Appuntamento'}`,
     note: [a.trattamento, a.note].filter(Boolean).join('\n'),
     inizio: utcStamp(a.inizio), fine: utcStamp(fine)
   };
@@ -531,7 +531,7 @@ VISTE.app = async (id, pazPre = '') => {
       ${nuovo ? '' : `<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
       <button type="button" class="b o" id="ics">Apple / altri (.ics)</button></div>
       <h3>Promemoria paziente</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">Invia promemoria WhatsApp</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}
-      <p class="m">Nel calendario compaiono solo le iniziali del paziente, per tutelare la privacy.</p>`}`
+      <p class="m">Nel calendario compaiono nome, cognome e tipo di appuntamento.</p>`}`
   });
   $('#dl').onchange = e => { const l = S.listino.find(x => x.id === e.target.value); if (l) { $('#trt').value = l.nome; $('#f [name=durata_min]').value = l.durata_min; } };
   $('#f').onsubmit = e => {
