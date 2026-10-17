@@ -477,11 +477,12 @@ VISTE.agenda = async () => {
 /* ---------- CALENDARIO ---------- */
 const iniziali = id => nomePaz(id).split(/\s+/).filter(Boolean).map(x => x[0].toUpperCase() + '.').join('');
 const utcStamp = d => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+const nomeCogn = id => { const p = S.pazienti.find(x => x.id === id); return p ? `${p.nome} ${p.cognome}`.trim() : ''; };
 function datiCal(a) {
   const fine = new Date(new Date(a.inizio).getTime() + (a.durata_min || 30) * 60000);
   return {
-    titolo: `${nomePaz(a.paziente_id)} - ${a.tipo || 'Appuntamento'}`,
-    note: [a.trattamento, a.note].filter(Boolean).join('\n'),
+    titolo: [nomeCogn(a.paziente_id), a.tipo || 'Appuntamento', a.trattamento].filter(Boolean).join(' - '),
+    note: a.note || '',
     inizio: utcStamp(a.inizio), fine: utcStamp(fine)
   };
 }
