@@ -474,6 +474,42 @@ VISTE.agenda = async () => {
   if ($('#nuovo')) $('#nuovo').onclick = () => go('#/app/new');
 };
 
+/* ---------- CALENDARIO ---------- */
+const iniziali = id => nomePaz(id).split(/\s+/).filter(Boolean).map(x => x[0].toUpperCase() + '.').join('');
+const utcStamp = d => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+function datiCal(a) {
+  const fine = new Date(new Date(a.inizio).getTime() + (a.durata_min || 30) * 60000);
+  return {
+    titolo: `${a.tipo || 'Appuntamento'} - ${iniziali(a.paziente_id)}`,
+    note: [a.trattamento, a.note].filter(Boolean).join('\n'),
+    inizio: utcStamp(a.inizio), fine: utcStamp(fine)
+  };
+}
+function gcalLink(a) {
+  const c = datiCal(a);
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(c.titolo) +
+    '&dates=' + c.inizio + '/' + c.fine + '&details=' + encodeURIComponent(c.note);
+}
+function waLink(a) {
+  const pz = S.pazienti.find(x => x.id === a.paziente_id) || {};
+  let n = String(pz.telefono || '').replace(/[^\d+]/g, '');
+  if (n.startsWith('00')) n = n.slice(2); else if (n.startsWith('+')) n = n.slice(1); else if (n) n = '39' + n.replace(/^0+(?=3)/, '');
+  const d = new Date(a.inizio), t0 = new Date(); t0.setHours(0, 0, 0, 0);
+  const gg = Math.round((new Date(d).setHours(0, 0, 0, 0) - t0) / 86400000);
+  const quando = gg === 0 ? 'di oggi' : gg === 1 ? 'di domani' : 'del ' + d.toLocaleDateString('it-IT');
+  const testo = `Buongiorno ${pz.nome || ''}, le ricordiamo il suo appuntamento ${quando} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}. Per conferme o spostamenti risponda a questo messaggio.`;
+  return n ? `https://wa.me/${n}?text=${encodeURIComponent(testo)}` : '';
+}
+function scaricaIcs(a) {
+  const c = datiCal(a), esc2 = t => String(t).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, m => '\\' + m);
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Clinica//IT', 'BEGIN:VEVENT', `UID:${a.id}@clinica`,
+    `DTSTAMP:${utcStamp(new Date())}`, `DTSTART:${c.inizio}`, `DTEND:${c.fine}`, `SUMMARY:${esc2(c.titolo)}`,
+    `DESCRIPTION:${esc2(c.note)}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  const l = document.createElement('a'); l.href = url; l.download = 'appuntamento.ics'; document.body.appendChild(l); l.click(); l.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
 VISTE.app = async (id, pazPre = '') => {
   const nuovo = id === 'new', mod = can('agenda', true);
   const a = nuovo ? { durata_min: 30, tipo: 'Visita', stato: 'Programmato', trattamento: '', note: '' } : S.appuntamenti.find(x => x.id === id) || {};
@@ -491,7 +527,11 @@ VISTE.app = async (id, pazPre = '') => {
       <label class="f">Scegli dal listino<select id="dl"><option value="">—</option>${S.listino.filter(l => l.attivo).map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('')}</select></label>
       <label class="f">Stato${scelta('stato', ['Programmato', 'Eseguito', 'Annullato'], a.stato)}</label>
       ${area('Note', 'note', a.note)}</fieldset>
-      <div class="row">${mod ? '<button class="b">Salva</button>' : ''}${!nuovo && can('eliminazione', true) ? '<button type="button" class="b d" id="del">Elimina appuntamento</button>' : ''}</div></form>`
+      <div class="row">${mod ? '<button class="b">Salva</button>' : ''}${!nuovo && can('eliminazione', true) ? '<button type="button" class="b d" id="del">Elimina appuntamento</button>' : ''}</div></form>
+      ${nuovo ? '' : `<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
+      <button type="button" class="b o" id="ics">Apple / altri (.ics)</button></div>
+      <h3>Promemoria paziente</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">Invia promemoria WhatsApp</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}
+      <p class="m">Nel calendario compaiono solo le iniziali del paziente, per tutelare la privacy.</p>`}`
   });
   $('#dl').onchange = e => { const l = S.listino.find(x => x.id === e.target.value); if (l) { $('#trt').value = l.nome; $('#f [name=durata_min]').value = l.durata_min; } };
   $('#f').onsubmit = e => {
@@ -505,6 +545,7 @@ VISTE.app = async (id, pazPre = '') => {
       S.appuntamenti = await q(sb.from('appuntamenti').select('*').order('inizio')); history.back();
     });
   };
+  if ($('#ics')) $('#ics').onclick = () => scaricaIcs(a);
   const del = $('#del');
   if (del) del.onclick = () => conferma('Eliminare l\'appuntamento?', 'L\'operazione non si può annullare.', () => ok(async () => {
     await q(sb.from('appuntamenti').delete().eq('id', id));
