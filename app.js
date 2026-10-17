@@ -82,16 +82,19 @@ const campo = (et, nome, val = '', tipo = 'text', extra = '') =>
 const area = (et, nome, val = '') => `<label class="f">${esc(et)}<textarea name="${nome}">${esc(val)}</textarea></label>`;
 const scelta = (nome, opzioni, sel) =>
   `<div class="chips">${opzioni.map(o => `<label><input type="radio" name="${nome}" value="${esc(o)}" ${o === sel ? 'checked' : ''}>${esc(o)}</label>`).join('')}</div>`;
+const numWa = t => { let n = String(t || '').replace(/[^\d+]/g, ''); if (n.startsWith('00')) return n.slice(2); if (n.startsWith('+')) return n.slice(1); return n ? '39' + n.replace(/^0+(?=3)/, '') : ''; };
+const inizPaz = p => `${(p.cognome || '')[0] || ''}${(p.nome || '')[0] || ''}`.toUpperCase();
+const medicoBreve = m => (m.includes('Delia') && m.includes('Micieli')) ? 'Entrambi' : m;
 const kv = (e, v) => `<div class="kv"><span>${esc(e)}</span><span>${v}</span></div>`;
 
 function schermo({ titolo, back = false, azioni = '', nav = null, body }) {
   const navi = nav ? `<nav class="bar"><div>
-    <a href="#/pazienti" class="${nav === 'pazienti' ? 'on' : ''}"><b>👥</b>Pazienti</a>
-    ${can('agenda') ? `<a href="#/agenda" class="${nav === 'agenda' ? 'on' : ''}"><b>📅</b>Agenda</a>` : ''}
-    ${can('listino') ? `<a href="#/listino" class="${nav === 'listino' ? 'on' : ''}"><b>💶</b>Listino</a>` : ''}
-    ${me.ruolo === 'admin' ? `<a href="#/utenti" class="${nav === 'utenti' ? 'on' : ''}"><b>🔑</b>Utenti</a>` : ''}
-    <button id="esci"><b style="display:block;font-size:20px">⎋</b>Esci</button></div></nav>` : '';
-  $('#app').innerHTML = `<header class="top">${back ? '<button class="ic" id="bk" aria-label="Indietro">←</button>' : '<img class="logo" src="icons/icon-192.png" alt="">'}
+    <a href="#/pazienti" class="${nav === 'pazienti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.8a3.4 3.4 0 010 6.4M18.5 14.8c1.8.7 2.8 2.3 3 4.7"/></svg></b>Pazienti</a>
+    ${can('agenda') ? `<a href="#/agenda" class="${nav === 'agenda' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></b>Agenda</a>` : ''}
+    ${can('listino') ? `<a href="#/listino" class="${nav === 'listino' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/></svg></b>Listino</a>` : ''}
+    ${me.ruolo === 'admin' ? `<a href="#/utenti" class="${nav === 'utenti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></b>Utenti</a>` : ''}
+    <button id="esci"><b style="display:block"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4M15 8l4 4-4 4M19 12H9"/></svg></b>Esci</button></div></nav>` : '';
+  $('#app').innerHTML = `<header class="top">${back ? '<button class="ic" id="bk" aria-label="Indietro">←</button>' : '<img class="logo" src="icons/logo-loto.png" alt="">'}
     <h1>${esc(titolo)}</h1><div>${azioni}</div></header><main>${body}</main>${navi}`;
   if (back) $('#bk').onclick = indietro;
   const e = $('#esci'); if (e) e.onclick = () => conferma('Uscire?', 'Dovrai rifare l\'accesso.', esci);
@@ -100,12 +103,12 @@ function schermo({ titolo, back = false, azioni = '', nav = null, body }) {
 
 /* ---------- accesso ---------- */
 function vistaLogin(msg = '') {
-  $('#app').innerHTML = `<div class="login"><img src="icons/icon-192.png" alt=""><h1>Clinica Pazienti</h1>
+  $('#app').innerHTML = `<div class="login"><img src="icons/logo-loto.png" alt=""><h1>PROAESTHETICS</h1><p class="sub">Chirurgia plastica ed estetica</p><div class="gl"></div>
     <form id="lf" autocomplete="on">
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.</p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -171,8 +174,12 @@ VISTE.pazienti = async () => {
     const ins = document.querySelector('input[name=ord]:checked').value === 'ins';
     const l = S.pazienti.filter(p => !t || `${p.cognome} ${p.nome} ${p.telefono || ''}`.toLowerCase().includes(t))
       .sort(ins ? (a, b) => String(b.creato_il || '').localeCompare(String(a.creato_il || '')) : (a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`, 'it'));
-    $('#lista').innerHTML = l.length ? l.map(p => `<a class="it" href="#/paziente/${p.id}"><b>${esc(p.cognome)} ${esc(p.nome)}</b><br><small>${esc(p.telefono || '')}</small></a>`).join('')
-      : '<p class="m">Nessun paziente</p>';
+    let prec = '';
+    $('#lista').innerHTML = l.length ? l.map(p => {
+      const lt = (p.cognome || '?')[0].toUpperCase(), testa = !ins && lt !== prec ? `<div class="lt">${esc(lt)}</div>` : ''; prec = lt;
+      const med = p.medici ? `<span class="tag">${esc(medicoBreve(p.medici))}</span>` : '';
+      return `${testa}<a class="it pz" href="#/paziente/${p.id}"><span class="av">${esc(inizPaz(p))}</span><span class="g"><b>${esc(p.cognome)} ${esc(p.nome)}</b><br><small>${esc(p.telefono || '')}</small></span>${med}</a>`;
+    }).join('') : '<p class="m">Nessun paziente</p>';
   };
   $('#cerca').oninput = disegna;
   document.querySelectorAll('input[name=ord]').forEach(r => r.onchange = disegna); disegna();
@@ -227,8 +234,10 @@ VISTE.paziente = async (id, tab = 'scheda') => {
   if (can('conti')) tabs.push(['conti', 'Conti']);
   if (!tabs.some(t => t[0] === tab)) tab = 'scheda';
   schermo({
-    titolo: `${pz.cognome} ${pz.nome}`, back: true, azioni: '<button class="t" id="pdf">PDF / Stampa</button>',
-    body: `${tabs.length > 1 ? `<div class="tabs">${tabs.map(t => `<a class="${t[0] === tab ? 'on' : ''}" href="#/paziente/${id}/${t[0]}" replace>${t[1]}</a>`).join('')}</div>` : ''}<div id="tc"></div>`
+    titolo: 'Paziente', back: true, azioni: '<button class="t" id="pdf">PDF / Stampa</button>',
+    body: `<div class="phd"><span class="av big">${esc(inizPaz(pz))}</span><div><div class="nm">${esc(pz.cognome)} ${esc(pz.nome)}</div><small class="m">${esc(pz.telefono || '')}</small></div></div>
+      <div class="qa">${pz.telefono ? `<a class="b o" href="tel:${esc(pz.telefono)}">Chiama</a><a class="b o" target="_blank" rel="noopener" href="https://wa.me/${numWa(pz.telefono)}">WhatsApp</a>` : ''}${can('agenda', true) ? `<a class="b" href="#/app/new/${id}">Fissa</a>` : ''}</div>
+      ${tabs.length > 1 ? `<div class="tabs">${tabs.map(t => `<a class="${t[0] === tab ? 'on' : ''}" href="#/paziente/${id}/${t[0]}" replace>${t[1]}</a>`).join('')}</div>` : ''}<div id="tc"></div>`
   });
   $('#pdf').onclick = () => ok(() => stampa(id));
   log('apri_paziente', id);
@@ -390,7 +399,7 @@ async function tabConti(pz) {
   ]);
   const acc = prev.filter(p => p.stato === 'Accettato').reduce((s, p) => s + totPrev(p), 0);
   const pagato = pag.reduce((s, p) => s + (+p.importo || 0), 0);
-  $('#tc').innerHTML = `<div class="card" style="margin-top:0">${kv('Accettato', euro(acc))}${kv('Pagato', euro(pagato))}<div style="padding-top:8px"><b>Residuo: ${euro(acc - pagato)}</b></div></div>
+  $('#tc').innerHTML = `<div class="sum"><div class="lb">Residuo</div><div class="big">${euro(acc - pagato)}</div><div class="sm">Accettato ${euro(acc)} · Pagato ${euro(pagato)}</div><div class="bar"><i style="width:${acc > 0 ? Math.min(100, Math.max(0, pagato / acc * 100)) : 0}%"></i></div></div>
     <h3>Preventivi</h3>${mod ? `<a class="b o" href="#/prev/${id}/new">Nuovo preventivo</a>` : ''}
     ${prev.length ? prev.map(p => `<a class="card" style="display:block;color:inherit;text-decoration:none" href="#/prev/${id}/${p.id}">
       <div class="m">${esc(fData(p.creato_il))} · ${esc(p.stato)}</div><b>${euro(totPrev(p))}</b><div>${esc((p.voci || []).map(v => v.nome).join(', '))}</div></a>`).join('') : '<p class="m">Nessun preventivo</p>'}
@@ -478,8 +487,8 @@ VISTE.agenda = async () => {
       const d = isoData(new Date(a.inizio));
       return agFiltro === 'Oggi' ? d === oggi : agFiltro === 'Prossimi' ? d >= oggi && a.stato !== 'Annullato' : true;
     });
-    $('#lista').innerHTML = l.length ? l.map(a => `<a class="it" href="#/app/${a.id}"><span class="over">${esc(fDataOra(a.inizio))} · ${a.durata_min} min · ${esc(a.stato)}</span><br>
-      <b>${esc(nomePaz(a.paziente_id))}</b><br><small>${esc([a.tipo, a.trattamento].filter(Boolean).join(' · '))}</small></a>`).join('') : '<p class="m">Nessun appuntamento</p>';
+    $('#lista').innerHTML = l.length ? l.map(a => `<a class="it ag" href="#/app/${a.id}"><span class="tm">${esc(new Date(a.inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }))}<small>${esc(new Date(a.inizio).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }))}</small></span>
+      <span class="g"><span class="over">${esc(a.tipo || '')} · ${a.durata_min} min</span><br><b>${esc(nomePaz(a.paziente_id))}</b><br><small>${esc(a.trattamento || '')}</small></span><span class="st ${a.stato === 'Programmato' ? '' : 'x'}">${esc(a.stato)}</span></a>`).join('') : '<p class="m">Nessun appuntamento</p>';
   };
   document.querySelectorAll('#flt input').forEach(i => i.onchange = () => { agFiltro = i.value; disegna(); });
   disegna();
