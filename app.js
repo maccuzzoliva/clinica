@@ -109,7 +109,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v6</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v7</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -643,7 +643,7 @@ VISTE.app = async (id, pazPre = '') => {
       <label class="f">Stato${scelta('stato', ['Programmato', 'Eseguito', 'Annullato'], a.stato)}</label>
       ${area('Note', 'note', a.note)}</fieldset>
       <div class="row">${mod ? '<button class="b">Salva</button>' : ''}${!nuovo && can('eliminazione', true) ? '<button type="button" class="b d" id="del">Elimina appuntamento</button>' : ''}</div></form>
-      ${nuovo ? '' : `${appenaSalvato ? `<div class="okb">✓ Appuntamento salvato. ${appenaSalvato === 'Annullato' ? 'Se WhatsApp non si è aperto, invia qui l\'avviso di annullamento.' : 'Invia ora il promemoria al paziente.'}</div>` : ''}${a.stato === 'Eseguito' ? '' : `<h3>${a.stato === 'Annullato' ? 'Avviso di annullamento' : 'Promemoria paziente'}</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">${a.stato === 'Annullato' ? 'Invia avviso di annullamento WhatsApp' : 'Invia promemoria WhatsApp'}</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}`}<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
+      ${nuovo ? '' : `${appenaSalvato ? `<div class="okb">✓ Appuntamento salvato. ${appenaSalvato === 'Annullato' ? 'Invia ora al paziente il messaggio di annullamento.' : 'Invia ora il promemoria al paziente.'}</div>` : ''}${a.stato === 'Eseguito' ? '' : `<h3>Promemoria paziente</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">Invia promemoria WhatsApp</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}`}<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
       <button type="button" class="b o" id="ics">Apple / altri (.ics)</button></div>
       <p class="m">Nel calendario compaiono nome e cognome, tipo e trattamento.</p>`}`
   });
@@ -660,7 +660,6 @@ VISTE.app = async (id, pazPre = '') => {
       S.appuntamenti = await q(sb.from('appuntamenti').select('*').order('inizio'));
       if (rec.stato === 'Eseguito') return indietro();
       salvato = rec.stato;
-      if (rec.stato === 'Annullato') { const l = waLink({ ...rec, id: nid }); if (l) { try { window.open(l, '_blank', 'noopener'); } catch (e) { } } }
       if (nuovo) location.replace('#/app/' + nid); else VISTE.app(nid);
     });
   };
