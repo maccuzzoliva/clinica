@@ -109,7 +109,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v5</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v6</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -605,7 +605,12 @@ function waLink(a) {
   if (n.startsWith('00')) n = n.slice(2); else if (n.startsWith('+')) n = n.slice(1); else if (n) n = '39' + n.replace(/^0+(?=3)/, '');
   const d = new Date(a.inizio);
   const saluto = new Date().getHours() < 17 ? 'Buongiorno' : 'Buonasera';
-  const testo = `${saluto} ${pz.nome || ''}, le confermiamo l'appuntamento del ${d.toLocaleDateString('it-IT')} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.\n\nSTUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA`;
+  if (a.stato === 'Eseguito') return '';
+  const dt = d.toLocaleDateString('it-IT'), hh = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const firma = '\n\nSTUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA';
+  const testo = a.stato === 'Annullato'
+    ? `${saluto} ${pz.nome || ''}, ci dispiace informarla che l'appuntamento del ${dt} alle ${hh} è stato annullato.\n\nLa ricontatteremo al più presto per comunicarle la prima data utile.${firma}`
+    : `${saluto} ${pz.nome || ''}, le confermiamo l'appuntamento del ${dt} alle ${hh}.${firma}`;
   return n ? `https://wa.me/${n}?text=${encodeURIComponent(testo)}` : '';
 }
 function scaricaIcs(a) {
@@ -618,9 +623,9 @@ function scaricaIcs(a) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-let salvato = false;
+let salvato = '';
 VISTE.app = async (id, pazPre = '') => {
-  const appenaSalvato = salvato; salvato = false;
+  const appenaSalvato = salvato; salvato = '';
   const nuovo = id === 'new', mod = can('agenda', true);
   const a = nuovo ? { durata_min: 30, tipo: 'Visita', stato: 'Programmato', trattamento: '', note: '' } : S.appuntamenti.find(x => x.id === id) || {};
   const ini = a.inizio ? new Date(a.inizio) : new Date();
@@ -638,7 +643,7 @@ VISTE.app = async (id, pazPre = '') => {
       <label class="f">Stato${scelta('stato', ['Programmato', 'Eseguito', 'Annullato'], a.stato)}</label>
       ${area('Note', 'note', a.note)}</fieldset>
       <div class="row">${mod ? '<button class="b">Salva</button>' : ''}${!nuovo && can('eliminazione', true) ? '<button type="button" class="b d" id="del">Elimina appuntamento</button>' : ''}</div></form>
-      ${nuovo ? '' : `${appenaSalvato ? '<div class="okb">✓ Appuntamento salvato. Invia ora il promemoria al paziente.</div>' : ''}<h3>Promemoria paziente</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">Invia promemoria WhatsApp</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
+      ${nuovo ? '' : `${appenaSalvato ? `<div class="okb">✓ Appuntamento salvato. ${appenaSalvato === 'Annullato' ? 'Se WhatsApp non si è aperto, invia qui l\'avviso di annullamento.' : 'Invia ora il promemoria al paziente.'}</div>` : ''}${a.stato === 'Eseguito' ? '' : `<h3>${a.stato === 'Annullato' ? 'Avviso di annullamento' : 'Promemoria paziente'}</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">${a.stato === 'Annullato' ? 'Invia avviso di annullamento WhatsApp' : 'Invia promemoria WhatsApp'}</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}`}<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
       <button type="button" class="b o" id="ics">Apple / altri (.ics)</button></div>
       <p class="m">Nel calendario compaiono nome e cognome, tipo e trattamento.</p>`}`
   });
@@ -653,7 +658,9 @@ VISTE.app = async (id, pazPre = '') => {
       let nid = id;
       if (nuovo) { const r = await q(sb.from('appuntamenti').insert(rec).select().single()); nid = r.id; } else await q(sb.from('appuntamenti').update(rec).eq('id', id));
       S.appuntamenti = await q(sb.from('appuntamenti').select('*').order('inizio'));
-      salvato = true;
+      if (rec.stato === 'Eseguito') return indietro();
+      salvato = rec.stato;
+      if (rec.stato === 'Annullato') { const l = waLink({ ...rec, id: nid }); if (l) { try { window.open(l, '_blank', 'noopener'); } catch (e) { } } }
       if (nuovo) location.replace('#/app/' + nid); else VISTE.app(nid);
     });
   };
