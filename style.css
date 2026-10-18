@@ -111,3 +111,16 @@ a.gm{display:block;color:inherit;text-decoration:none}.gm .st{float:right}
 .ab{display:flex;gap:8px;margin-top:10px}.ab .b{flex:1;min-height:44px;font-size:13px;gap:6px;display:flex;align-items:center;justify-content:center}
 .ag.pr{border-color:#D9B866}
 .okb{background:#FAF7F0;border:1px solid #D9B866;border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px;margin:14px 0 4px}
+
+/* relazioni */
+a.card.rl{display:block;color:inherit;text-decoration:none;margin-top:10px}
+#print .rel{font-family:Georgia,'Times New Roman',serif;font-size:13.5px;line-height:1.55;color:#111}
+#print .rel .hd{text-align:center;border-bottom:2px solid #B8892F;padding-bottom:14px}#print .rel .hd img{height:62px}
+#print .rel .hd h1{font:600 22px Georgia,serif;letter-spacing:.2em;margin:8px 0 2px}#print .rel .hd p{margin:0;font:9.5px Arial,sans-serif;letter-spacing:.2em;color:#6B6559}
+#print .rel h2{text-align:center;font:700 16px Georgia,serif;letter-spacing:.08em;margin:24px 0 16px;color:#111}
+#print .rel .meta{display:flex;justify-content:space-between;border:1px solid #D9B866;padding:10px 14px;margin-bottom:14px;background:#FAF7F0}
+#print .rel h3{font:700 11px Arial,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8A6417;border:0;margin:16px 0 3px;padding:0}
+#print .rel p{margin:0}
+#print .rel .fir{display:flex;justify-content:space-between;align-items:flex-end;margin-top:70px;page-break-inside:avoid}
+#print .rel .fir .s{width:230px;text-align:center;border-top:1px solid #111;padding-top:5px;font-size:12px;color:#111}
+#print .rel .ft{text-align:center;font:9px Arial,sans-serif;color:#8c867a;letter-spacing:.1em;margin-top:30px}

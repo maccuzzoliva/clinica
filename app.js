@@ -109,7 +109,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v4</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v5</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -269,9 +269,10 @@ function tabScheda(pz) {
 /* ---------- CLINICA ---------- */
 async function tabClinica(pz) {
   const id = pz.id, mod = can('clinica', true);
-  const [an, note] = await Promise.all([
+  const [an, note, rels] = await Promise.all([
     q(sb.from('anamnesi').select('*').eq('paziente_id', id)),
-    q(sb.from('note_cliniche').select('*').eq('paziente_id', id).order('creato_il', { ascending: false }))
+    q(sb.from('note_cliniche').select('*').eq('paziente_id', id).order('creato_il', { ascending: false })),
+    q(sb.from('relazioni').select('*').eq('paziente_id', id).order('data_relazione', { ascending: false })).catch(() => [])
   ]);
   const a = an[0] || {};
   const dis = mod ? '' : 'disabled';
@@ -284,10 +285,12 @@ async function tabClinica(pz) {
       <label class="f">Fumo${scelta('fumatore', ['No', 'Ex', 'Sì'], a.fumatore || '')}</label>
       ${mod ? '<div class="row"><button class="b">Salva anamnesi</button></div>' : ''}</form>
     <h3>Note cliniche</h3>
-    ${mod ? `<form id="fn">${area('Nuova nota', 'testo')}<div class="row"><button class="b" id="addn" disabled>Aggiungi nota</button></div></form>` : ''}
+    ${mod ? `<form id="fn">${area('Nuova nota', 'testo')}<div class="row"><button class="b" id="addn" disabled style="flex:1">Aggiungi nota</button><a class="b o" id="relb" style="flex:1" href="#/rel/new/${id}">Relazioni Clinica</a></div></form>` : ''}
     ${note.length ? note.map(n => `<div class="card"><div class="m">${esc(fDataOra(n.creato_il))} · ${esc(n.autore_nome)}</div>
       <div>${esc(n.testo).replace(/\n/g, '<br>')}</div>
-      ${can('eliminazione', true) ? `<button class="t d" data-del="${n.id}">Elimina</button>` : ''}</div>`).join('') : '<p class="m">Nessuna nota</p>'}`;
+      ${can('eliminazione', true) ? `<button class="t d" data-del="${n.id}">Elimina</button>` : ''}</div>`).join('') : '<p class="m">Nessuna nota</p>'}
+    <h3>Relazioni cliniche</h3>
+    ${rels.length ? rels.map(r => `<a class="card rl" href="#/rel/${r.id}/${id}"><b>Relazione ${esc((r.tipo || '').toLowerCase())}</b><div class="m">${esc(fData(r.data_relazione))}${r.medico ? ' · ' + esc(r.medico) : ''}${r.diagnosi ? ' · ' + esc(r.diagnosi.split('\n')[0].slice(0, 40)) : ''}</div></a>`).join('') : '<p class="m">Nessuna relazione</p>'}`;
   if (mod) {
     $('#fa').onsubmit = e => {
       e.preventDefault(); const d = fobj(e.target);
@@ -311,6 +314,68 @@ async function tabClinica(pz) {
       await q(sb.from('note_cliniche').delete().eq('id', b.dataset.del)); await tabClinica(pz);
     })));
 }
+
+/* ---------- RELAZIONI CLINICHE ---------- */
+const REL_TIPI = ['Pre-operatoria', 'Post-operatoria', 'Di controllo', 'Altro'];
+const REL_MEDICI = ['Prof. Delia', 'Dott. Micieli'];
+function relHtml(pz, r) {
+  const tt = { 'Pre-operatoria': ' PRE-OPERATORIA', 'Post-operatoria': ' POST-OPERATORIA', 'Di controllo': ' DI CONTROLLO' }[r.tipo] || '';
+  const sez = (t, v) => v && String(v).trim() ? `<h3>${t}</h3><p>${esc(v).replace(/\n/g, '<br>')}</p>` : '';
+  return `<div class="rel"><div class="hd"><img src="${LOGO}" alt=""><h1>PROAESTHETICS</h1><p>STUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA</p></div>
+    <h2>RELAZIONE CLINICA${tt}</h2>
+    <div class="meta"><div><b>Paziente:</b> ${esc(pz.cognome)} ${esc(pz.nome)}<br>${pz.data_nascita ? `<b>Nato/a il:</b> ${esc(fData(pz.data_nascita))}<br>` : ''}${pz.codice_fiscale ? `<b>Cod. fiscale:</b> ${esc(pz.codice_fiscale)}` : ''}</div>
+    <div style="text-align:right"><b>Data:</b> ${esc(fData(r.data_relazione))}<br>${r.medico ? `<b>Medico:</b> ${esc(r.medico)}` : ''}</div></div>
+    ${sez('Motivo della visita / Anamnesi', r.motivo)}${sez('Esame obiettivo', r.esame)}${sez('Diagnosi', r.diagnosi)}${sez('Intervento / trattamento proposto', r.intervento)}${sez('Decorso e conclusioni', r.conclusioni)}
+    <div class="fir"><div>Messina, ${esc(fData(r.data_relazione))}</div><div class="s">Firma e timbro del medico</div></div>
+    <div class="ft">STUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA</div></div>`;
+}
+async function stampaRel(pz, r) {
+  const p = $('#print'); p.innerHTML = relHtml(pz, r);
+  await Promise.all([...p.querySelectorAll('img')].map(i => i.complete ? 0 : new Promise(x => { i.onload = i.onerror = x; })));
+  const t = document.title; document.title = `Relazione ${pz.cognome} ${pz.nome}`;
+  window.print();
+  setTimeout(() => { document.title = t; p.innerHTML = ''; }, 1500);
+}
+VISTE.rel = async (id, pazId) => {
+  const nuovo = id === 'new', mod = can('clinica', true);
+  let r = nuovo ? null : (await q(sb.from('relazioni').select('*').eq('id', id))).find(x => x.id === id);
+  if (!nuovo && !r) return schermo({ titolo: 'Relazione', back: true, body: '<p>Relazione non trovata</p>' });
+  const pid = nuovo ? pazId : r.paziente_id;
+  const pz = S.pazienti.find(x => x.id === pid);
+  if (!pz) return schermo({ titolo: 'Relazione', back: true, body: '<p>Paziente non trovato</p>' });
+  if (nuovo) {
+    const an = (await q(sb.from('anamnesi').select('*').eq('paziente_id', pid)))[0] || {};
+    r = { data_relazione: oggiISO(), tipo: 'Pre-operatoria', medico: REL_MEDICI.find(m => (pz.medici || '').includes(m)) || '', motivo: '', esame: '', diagnosi: an.diagnosi || '', intervento: an.tipo_intervento || '', conclusioni: '' };
+  }
+  schermo({
+    titolo: nuovo ? 'Nuova relazione' : 'Relazione', back: true,
+    body: `<p class="m" style="margin:6px 0 0">${esc(pz.cognome)} ${esc(pz.nome)}${pz.data_nascita ? ' · nato/a il ' + esc(fData(pz.data_nascita)) : ''}</p>
+    <form id="f"><fieldset style="border:0;padding:0;margin:0" ${mod ? '' : 'disabled'}>
+      <div class="grid2">${campo('Data', 'data_relazione', r.data_relazione, 'date', 'required')}
+      <label class="f">Medico<select name="medico"><option value="">—</option>${REL_MEDICI.map(m => `<option ${m === r.medico ? 'selected' : ''}>${m}</option>`).join('')}</select></label></div>
+      <label class="f">Tipo di relazione${scelta('tipo', REL_TIPI, r.tipo)}</label>
+      ${area('Motivo della visita / Anamnesi', 'motivo', r.motivo)}${area('Esame obiettivo', 'esame', r.esame)}${area('Diagnosi', 'diagnosi', r.diagnosi)}
+      ${area('Intervento / trattamento proposto', 'intervento', r.intervento)}${area('Decorso e conclusioni', 'conclusioni', r.conclusioni)}</fieldset>
+      <div class="row">${mod ? '<button class="b">Salva relazione</button>' : ''}<button type="button" class="b o" id="pdfr">PDF / Stampa</button>
+      ${!nuovo && can('eliminazione', true) ? '<button type="button" class="b d" id="del">Elimina relazione</button>' : ''}</div></form>`
+  });
+  document.querySelectorAll('#f textarea').forEach(t => { t.style.minHeight = '110px'; });
+  const leggi = () => { const d = fobj($('#f')); return { data_relazione: d.data_relazione, medico: d.medico || '', tipo: d.tipo || 'Altro', motivo: (d.motivo || '').trim(), esame: (d.esame || '').trim(), diagnosi: (d.diagnosi || '').trim(), intervento: (d.intervento || '').trim(), conclusioni: (d.conclusioni || '').trim() }; };
+  $('#pdfr').onclick = () => stampaRel(pz, leggi());
+  $('#f').onsubmit = e => {
+    e.preventDefault();
+    ok(async () => {
+      const rec = leggi();
+      if (nuovo) await q(sb.from('relazioni').insert({ ...rec, paziente_id: pid, autore_nome: me.nome || me.username }));
+      else await q(sb.from('relazioni').update(rec).eq('id', id));
+      log(nuovo ? 'nuova_relazione' : 'modifica_relazione', pid); indietro();
+    });
+  };
+  const del = $('#del');
+  if (del) del.onclick = () => conferma('Eliminare la relazione?', 'L\'operazione non si può annullare.', () => ok(async () => {
+    await q(sb.from('relazioni').delete().eq('id', id)); log('elimina_relazione', pid); indietro();
+  }));
+};
 
 /* ---------- FOTO ---------- */
 function preparaJpeg(file) {
