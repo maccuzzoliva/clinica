@@ -109,7 +109,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v3</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v4</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -475,23 +475,44 @@ VISTE.prev = async (pazId, id) => {
 };
 
 /* ---------- AGENDA ---------- */
-let agFiltro = 'Prossimi';
+let agFiltro = 'Prossimi', agGiorno = null, agSett = 0;
+const ICO_WA = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#D9B866" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 01-11.8 7L4 20l1.1-4A8 8 0 1120 12z"/></svg>';
+const ICO_CAL = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#8A6417" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
 VISTE.agenda = async () => {
   schermo({
     titolo: 'Agenda', nav: 'agenda',
-    body: `<div class="chips" id="flt">${['Oggi', 'Prossimi', 'Tutti'].map(o => `<label><input type="radio" name="f" value="${o}" ${o === agFiltro ? 'checked' : ''}>${o}</label>`).join('')}</div>
-      <div class="list" id="lista" style="margin-top:8px"></div>${can('agenda', true) ? '<button class="fab" id="nuovo" aria-label="Nuovo appuntamento">+</button>' : ''}`
+    body: `<div class="chips seg" id="flt">${['Oggi', 'Prossimi', 'Tutti'].map(o => `<label><input type="radio" name="f" value="${o}" ${!agGiorno && o === agFiltro ? 'checked' : ''}>${o}</label>`).join('')}</div>
+      <div class="wk"><button type="button" class="wn" id="wp" aria-label="Settimana precedente">‹</button><div id="wkd" class="wkd"></div><button type="button" class="wn" id="wnx" aria-label="Settimana successiva">›</button></div>
+      <p class="m" id="sub" style="margin:4px 0 10px"></p>
+      <div class="list" id="lista"></div>${can('agenda', true) ? '<button class="fab" id="nuovo" aria-label="Nuovo appuntamento">+</button>' : ''}`
   });
+  const GG = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
   const disegna = () => {
     const oggi = oggiISO();
+    const lun = new Date(); lun.setHours(12, 0, 0, 0); lun.setDate(lun.getDate() - ((lun.getDay() + 6) % 7) + agSett * 7);
+    const conta = {}; S.appuntamenti.forEach(x => { if (x.stato !== 'Annullato') { const k = isoData(new Date(x.inizio)); conta[k] = (conta[k] || 0) + 1; } });
+    $('#wkd').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => { const d = new Date(lun); d.setDate(lun.getDate() + i); const k = isoData(d);
+      return `<button type="button" class="dy ${k === agGiorno ? 'on' : ''} ${k === oggi ? 'oggi' : ''}" data-d="${k}"><span>${GG[d.getDay()]}</span><b>${d.getDate()}</b><i class="${conta[k] ? 'p' : ''}"></i></button>`; }).join('');
     const l = S.appuntamenti.filter(a => {
       const d = isoData(new Date(a.inizio));
+      if (agGiorno) return d === agGiorno;
       return agFiltro === 'Oggi' ? d === oggi : agFiltro === 'Prossimi' ? d >= oggi && a.stato !== 'Annullato' : true;
     });
-    $('#lista').innerHTML = l.length ? l.map(a => `<a class="it ag" href="#/app/${a.id}"><span class="tm">${esc(new Date(a.inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }))}<small>${esc(new Date(a.inizio).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }))}</small></span>
-      <span class="g"><span class="over">${esc(a.tipo || '')} · ${a.durata_min} min</span><br><b>${esc(nomePaz(a.paziente_id))}</b><br><small>${esc(a.trattamento || '')}</small></span><span class="st ${a.stato === 'Programmato' ? '' : 'x'}">${esc(a.stato)}</span></a>`).join('') : '<p class="m">Nessun appuntamento</p>';
+    const etich = agGiorno ? new Date(agGiorno + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }) : agFiltro === 'Oggi' ? 'Oggi' : agFiltro === 'Prossimi' ? 'Da oggi in poi' : 'Tutti gli appuntamenti';
+    $('#sub').textContent = `${etich[0].toUpperCase() + etich.slice(1)} · ${l.length} appuntament${l.length === 1 ? 'o' : 'i'}`;
+    $('#lista').innerHTML = l.length ? l.map(a => {
+      const pz = S.pazienti.find(x => x.id === a.paziente_id) || {}, wa = waLink(a);
+      const sub = [a.trattamento, pz.medici ? medicoBreve(pz.medici) : ''].filter(Boolean).join(' · ');
+      const prog = a.stato === 'Programmato';
+      return `<div class="it ag ${prog ? 'pr' : ''}"><span class="tm">${esc(new Date(a.inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }))}<small>${esc(new Date(a.inizio).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }))}</small></span>
+      <span class="g"><a class="gm" href="#/app/${a.id}"><span class="over">${esc(a.tipo || '')} · ${a.durata_min} min</span><span class="st ${prog ? '' : 'x'}">${esc(a.stato)}</span><br><b>${esc(nomePaz(a.paziente_id))}</b><br><small>${esc(sub)}</small></a>
+      ${prog ? `<span class="ab">${wa ? `<a class="b" target="_blank" rel="noopener" href="${esc(wa)}">${ICO_WA}Promemoria</a>` : ''}<a class="b o" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">${ICO_CAL}Calendario</a></span>` : ''}</span></div>`;
+    }).join('') : '<p class="m">Nessun appuntamento</p>';
   };
-  document.querySelectorAll('#flt input').forEach(i => i.onchange = () => { agFiltro = i.value; disegna(); });
+  document.querySelectorAll('#flt input').forEach(i => i.onchange = () => { agFiltro = i.value; agGiorno = null; if (i.value === 'Oggi') agSett = 0; disegna(); });
+  $('#wkd').onclick = e => { const b = e.target.closest('.dy'); if (!b) return; agGiorno = agGiorno === b.dataset.d ? null : b.dataset.d; document.querySelectorAll('#flt input').forEach(i => i.checked = !agGiorno && i.value === agFiltro); disegna(); };
+  $('#wp').onclick = () => { agSett--; disegna(); };
+  $('#wnx').onclick = () => { agSett++; disegna(); };
   disegna();
   if ($('#nuovo')) $('#nuovo').onclick = () => go('#/app/new');
 };
@@ -532,7 +553,9 @@ function scaricaIcs(a) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
+let salvato = false;
 VISTE.app = async (id, pazPre = '') => {
+  const appenaSalvato = salvato; salvato = false;
   const nuovo = id === 'new', mod = can('agenda', true);
   const a = nuovo ? { durata_min: 30, tipo: 'Visita', stato: 'Programmato', trattamento: '', note: '' } : S.appuntamenti.find(x => x.id === id) || {};
   const ini = a.inizio ? new Date(a.inizio) : new Date();
@@ -550,9 +573,8 @@ VISTE.app = async (id, pazPre = '') => {
       <label class="f">Stato${scelta('stato', ['Programmato', 'Eseguito', 'Annullato'], a.stato)}</label>
       ${area('Note', 'note', a.note)}</fieldset>
       <div class="row">${mod ? '<button class="b">Salva</button>' : ''}${!nuovo && can('eliminazione', true) ? '<button type="button" class="b d" id="del">Elimina appuntamento</button>' : ''}</div></form>
-      ${nuovo ? '' : `<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
+      ${nuovo ? '' : `${appenaSalvato ? '<div class="okb">✓ Appuntamento salvato. Invia ora il promemoria al paziente.</div>' : ''}<h3>Promemoria paziente</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">Invia promemoria WhatsApp</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}<h3>Calendario</h3><div class="row"><a class="b o" id="gcal" target="_blank" rel="noopener" href="${esc(gcalLink(a))}">Google Calendar</a>
       <button type="button" class="b o" id="ics">Apple / altri (.ics)</button></div>
-      <h3>Promemoria paziente</h3>${waLink(a) ? `<a class="b" id="wa" target="_blank" rel="noopener" href="${esc(waLink(a))}">Invia promemoria WhatsApp</a>` : '<p class="m">Nessun numero di telefono nella scheda del paziente.</p>'}
       <p class="m">Nel calendario compaiono nome e cognome, tipo e trattamento.</p>`}`
   });
   $('#dl').onchange = e => { const l = S.listino.find(x => x.id === e.target.value); if (l) { $('#trt').value = l.nome; $('#f [name=durata_min]').value = l.durata_min; } };
@@ -563,8 +585,11 @@ VISTE.app = async (id, pazPre = '') => {
       tipo: d.tipo || 'Visita', trattamento: (d.trattamento || '').trim(), stato: d.stato || 'Programmato', note: (d.note || '').trim()
     };
     ok(async () => {
-      if (nuovo) await q(sb.from('appuntamenti').insert(rec)); else await q(sb.from('appuntamenti').update(rec).eq('id', id));
-      S.appuntamenti = await q(sb.from('appuntamenti').select('*').order('inizio')); history.back();
+      let nid = id;
+      if (nuovo) { const r = await q(sb.from('appuntamenti').insert(rec).select().single()); nid = r.id; } else await q(sb.from('appuntamenti').update(rec).eq('id', id));
+      S.appuntamenti = await q(sb.from('appuntamenti').select('*').order('inizio'));
+      salvato = true;
+      if (nuovo) location.replace('#/app/' + nid); else VISTE.app(nid);
     });
   };
   if ($('#ics')) $('#ics').onclick = () => scaricaIcs(a);

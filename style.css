@@ -99,3 +99,15 @@ h3{font:700 11px var(--sans);letter-spacing:.18em;text-transform:uppercase;color
 #print img{width:100%;max-height:260px;object-fit:contain}#print figcaption{font-size:10px;color:#555}
 
 .kv a{color:var(--gi);text-decoration:none}
+
+/* agenda v4 */
+.chips.seg{background:#F2EDE0;border-radius:12px;padding:3px;gap:2px;flex-wrap:nowrap;margin:0 0 12px}
+.chips.seg label{flex:1;justify-content:center;border:0;min-height:38px;padding:0 8px;border-radius:9px;font-size:13px}
+.wk{display:flex;align-items:center;gap:4px}.wkd{flex:1;display:flex;gap:4px}.wn{border:0;background:none;font-size:26px;width:26px;height:64px;color:#8A6417;padding:0}
+.dy{flex:1;min-width:0;height:64px;border:0;border-radius:14px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#6B6559;font:600 11px Manrope,sans-serif;padding:0;position:relative}
+.dy b{font-size:17px;color:#111}.dy i{width:5px;height:5px;border-radius:50%;background:transparent;display:block}.dy i.p{background:#B8892F}
+.dy.oggi b{color:#8A6417}.dy.on{background:#111;box-shadow:inset 0 -3px 0 #B8892F}.dy.on span{color:#D9B866}.dy.on b{color:#fff}
+a.gm{display:block;color:inherit;text-decoration:none}.gm .st{float:right}
+.ab{display:flex;gap:8px;margin-top:10px}.ab .b{flex:1;min-height:44px;font-size:13px;gap:6px;display:flex;align-items:center;justify-content:center}
+.ag.pr{border-color:#D9B866}
+.okb{background:#FAF7F0;border:1px solid #D9B866;border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px;margin:14px 0 4px}
