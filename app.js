@@ -111,7 +111,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v9</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v10</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -248,7 +248,7 @@ VISTE.conv = async k => {
   const ut = S.chat.utenti.find(u => u.id === k);
   const nome = k === 'studio' ? 'Studio' : ut ? nomeUt(ut) : 'Chat';
   schermo({
-    titolo: nome, back: true,
+    titolo: nome, back: true, azioni: (k !== 'studio' || me.ruolo === 'admin') ? '<button class="t" id="svuota">Svuota</button>' : '',
     body: `<div class="lock">🔒 ${k === 'studio' ? 'Gruppo Studio: lo leggono tutti gli utenti' : 'Solo tu e ' + esc(nome) + ' potete leggere questa chat'}</div>
     <div id="cm" class="chatl"></div>
     <form id="cf" class="cbar"><label class="cin"><textarea name="t" rows="1" placeholder="Scrivi un messaggio…"></textarea></label><button class="snd" aria-label="Invia">➤</button></form>`
@@ -262,10 +262,13 @@ VISTE.conv = async k => {
       const g = new Date(m.creato_il).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
       if (g !== giorno) { giorno = g; h += `<div class="day">${esc(g === new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }) ? 'Oggi' : g)}</div>`; }
       const mio = m.mittente === me.id;
-      h += `<div class="msg ${mio ? 'out' : 'in'}">${!mio && (k === 'studio' || true) ? `<small>${esc(m.mittente_nome || '')}</small>` : ''}${esc(m.testo).replace(/\n/g, '<br>')}<span class="o">${esc(oraMsg(m.creato_il))}</span></div>`;
+      h += `<div class="msg ${mio ? 'out' : 'in'}"${mio ? ` data-id="${esc(m.id)}"` : ''}>${!mio && (k === 'studio' || true) ? `<small>${esc(m.mittente_nome || '')}</small>` : ''}${esc(m.testo).replace(/\n/g, '<br>')}<span class="o">${esc(oraMsg(m.creato_il))}</span></div>`;
     });
     $('#cm').innerHTML = h || '<p class="m" style="text-align:center">Nessun messaggio. Scrivi il primo.</p>';
     if (ms.length !== nPrima) { nPrima = ms.length; window.scrollTo(0, document.body.scrollHeight); }
+    document.querySelectorAll('.msg.out[data-id]').forEach(el => el.onclick = () => conferma('Eliminare il messaggio?', 'Sparisce per tutti. Non si può annullare.', () => {
+      q(sb.from('chat_messaggi').delete().eq('id', el.dataset.id)).then(() => chatCarica()).then(disegna).catch(e => avviso('Attenzione', e.message || String(e)));
+    }));
     chatLetto(k);
   };
   disegna();
@@ -277,6 +280,12 @@ VISTE.conv = async k => {
   };
   $('#cf').onsubmit = e => { e.preventDefault(); invia(); };
   ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 700) { e.preventDefault(); invia(); } };
+  const sv = $('#svuota');
+  if (sv) sv.onclick = () => conferma('Svuotare la chat?', k === 'studio' ? 'Tutti i messaggi del gruppo verranno eliminati per tutti.' : 'Tutti i messaggi con ' + nome + ' verranno eliminati per entrambi. Non si può annullare.', () => {
+    const dels = k === 'studio' ? [sb.from('chat_messaggi').delete().is('destinatario', null)]
+      : [sb.from('chat_messaggi').delete().eq('mittente', me.id).eq('destinatario', k), sb.from('chat_messaggi').delete().eq('mittente', k).eq('destinatario', me.id)];
+    Promise.all(dels.map(d => q(d))).then(() => chatCarica()).then(disegna).catch(e => avviso('Attenzione', e.message || String(e)));
+  });
   chatT = setInterval(() => { chatCarica().then(disegna).catch(() => { }); }, 3000);
 };
 
