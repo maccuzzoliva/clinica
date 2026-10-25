@@ -92,12 +92,14 @@ function schermo({ titolo, back = false, azioni = '', nav = null, body }) {
   const navi = nav ? `<nav class="bar"><div>
     <a href="#/pazienti" class="${nav === 'pazienti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.8a3.4 3.4 0 010 6.4M18.5 14.8c1.8.7 2.8 2.3 3 4.7"/></svg></b>Pazienti</a>
     ${can('agenda') ? `<a href="#/agenda" class="${nav === 'agenda' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></b>Agenda</a>` : ''}
+    <a href="#/chat" class="${nav === 'chat' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg><i class="chbd" hidden></i></b>Chat</a>
     ${can('listino') ? `<a href="#/listino" class="${nav === 'listino' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/></svg></b>Listino</a>` : ''}
     ${me.ruolo === 'admin' ? `<a href="#/utenti" class="${nav === 'utenti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></b>Utenti</a>` : ''}
     <button id="esci"><b style="display:block"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4M15 8l4 4-4 4M19 12H9"/></svg></b>Esci</button></div></nav>` : '';
   $('#app').innerHTML = `<header class="top">${back ? '<button class="ic" id="bk" aria-label="Indietro">←</button>' : '<img class="logo" src="' + LOGO + '" alt="">'}
     <h1>${esc(titolo)}</h1><div>${azioni}</div></header><main>${body}</main>${navi}`;
   if (back) $('#bk').onclick = indietro;
+  if (typeof aggiornaBadge === 'function') aggiornaBadge();
   const e = $('#esci'); if (e) e.onclick = () => conferma('Uscire?', 'Dovrai rifare l\'accesso.', esci);
   window.scrollTo(0, 0);
 }
@@ -109,7 +111,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v8</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v9</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -136,7 +138,7 @@ async function entra() {
 }
 
 async function esci() {
-  me = null; S.pazienti = []; S.appuntamenti = []; S.listino = []; S.utenti = [];
+  me = null; S.pazienti = []; S.appuntamenti = []; S.listino = []; S.utenti = []; S.chat = { utenti: [], msgs: [], letti: {} };
   try { await sb.auth.signOut(); } catch (_) { /* ignora */ }
   location.hash = '';
   vistaLogin();
@@ -148,19 +150,21 @@ async function caricaTutto() {
   if (can('agenda')) job.push(q(sb.from('appuntamenti').select('*').order('inizio')).then(d => S.appuntamenti = d || []));
   if (can('listino') || can('conti') || can('agenda')) job.push(q(sb.from('listino').select('*').order('categoria').order('nome')).then(d => S.listino = d || []).catch(() => {}));
   if (me.ruolo === 'admin') job.push(q(sb.from('profiles').select('*').order('username')).then(d => S.utenti = d || []));
+  job.push(chatCarica().catch(() => { }));
   await Promise.all(job);
 }
 const nomePaz = id => { const p = S.pazienti.find(x => x.id === id); return p ? `${p.cognome} ${p.nome}`.trim() : '—'; };
 
 /* ---------- router ---------- */
 const VISTE = {};
+let chatT = null;
 async function render() {
   if (!me) return;
   const [nome, ...a] = (location.hash.replace(/^#\//, '') || 'pazienti').split('/').map(decodeURIComponent);
   const v = VISTE[nome] || VISTE.pazienti;
   try { await v(...a); } catch (e) { avviso('Attenzione', e.message || String(e)); }
 }
-window.addEventListener('hashchange', () => { chiudi(); render(); });
+window.addEventListener('hashchange', () => { clearInterval(chatT); chiudi(); render(); });
 
 /* ---------- dettatura vocale (microfono sui campi di testo lungo) ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -189,6 +193,92 @@ function micro(root) {
     };
   });
 }
+
+/* ---------- CHAT PRIVATA TRA UTENTI ---------- */
+S.chat = { utenti: [], msgs: [], letti: {} };
+const tms = d => new Date(d).getTime();
+const chatKey = m => m.destinatario == null ? 'studio' : (m.mittente === me.id ? m.destinatario : m.mittente);
+const chatNonLetti = k => S.chat.msgs.filter(m => m.mittente !== me.id && chatKey(m) === k && (!S.chat.letti[k] || tms(m.creato_il) > tms(S.chat.letti[k]))).length;
+const chatTotNuovi = () => ['studio', ...S.chat.utenti.map(u => u.id)].reduce((s, k) => s + chatNonLetti(k), 0);
+function aggiornaBadge() {
+  const n = me ? chatTotNuovi() : 0;
+  document.querySelectorAll('.chbd').forEach(e => { e.textContent = n > 99 ? '99+' : n; e.hidden = !n; });
+}
+async function chatCarica() {
+  if (!me) return;
+  const [u, m, l] = await Promise.all([
+    q(sb.rpc('utenti_chat')),
+    q(sb.from('chat_messaggi').select('*').order('creato_il', { ascending: false }).limit(500)),
+    q(sb.from('chat_letti').select('*'))
+  ]);
+  S.chat.utenti = (u || []).filter(x => x.id !== me.id);
+  S.chat.msgs = (m || []).slice().sort((x, y) => tms(x.creato_il) - tms(y.creato_il));
+  S.chat.letti = Object.fromEntries((l || []).map(x => [x.chat, x.ultimo]));
+  aggiornaBadge();
+}
+async function chatLetto(k) {
+  if (!chatNonLetti(k)) return;
+  const ora = new Date().toISOString();
+  S.chat.letti[k] = ora; aggiornaBadge();
+  try { await q(sb.from('chat_letti').upsert({ user_id: me.id, chat: k, ultimo: ora })); } catch (_) { }
+}
+setInterval(() => { if (me && !document.hidden) chatCarica().catch(() => { }); }, 20000);
+const oraMsg = d => new Date(d).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+const nomeUt = u => (u.nome || u.username || '').trim();
+const inizUt = u => nomeUt(u).split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('');
+
+VISTE.chat = async () => {
+  schermo({ titolo: 'Chat', nav: 'chat', body: '<div class="lock">🔒 Conversazioni private tra gli utenti dello studio</div><div id="cl"></div>' });
+  const disegna = () => {
+    const riga = (k, nome, ini, cls) => {
+      const ms = S.chat.msgs.filter(m => chatKey(m) === k), ult = ms[ms.length - 1], nn = chatNonLetti(k);
+      return `<a class="crow" href="#/conv/${esc(k)}"><span class="av ${cls}">${esc(ini)}</span><span class="g"><b>${esc(nome)}</b><small>${ult ? esc((ult.mittente === me.id ? 'Tu: ' : (k === 'studio' ? (ult.mittente_nome || '') + ': ' : '')) + ult.testo) : 'Nessun messaggio'}</small></span>
+        <span class="ct">${ult ? esc(oraMsg(ult.creato_il)) : ''}${nn ? `<br><span class="n">${nn}</span>` : ''}</span></a>`;
+    };
+    $('#cl').innerHTML = `<div class="over">Gruppo</div>${riga('studio', 'Studio', 'S', 'k')}<div class="over">Messaggi privati</div>` +
+      (S.chat.utenti.length ? S.chat.utenti.map(u => riga(u.id, nomeUt(u), inizUt(u), '')).join('') : '<p class="m">Nessun altro utente.</p>');
+  };
+  disegna();
+  try { await chatCarica(); disegna(); } catch (e) { $('#cl').insertAdjacentHTML('afterbegin', '<p class="warn">Chat non disponibile: esegui l\'aggiornamento del database (chat). ' + esc(e.message) + '</p>'); }
+};
+
+VISTE.conv = async k => {
+  clearInterval(chatT);
+  if (!S.chat.utenti.length && k !== 'studio') { try { await chatCarica(); } catch (_) { } }
+  const ut = S.chat.utenti.find(u => u.id === k);
+  const nome = k === 'studio' ? 'Studio' : ut ? nomeUt(ut) : 'Chat';
+  schermo({
+    titolo: nome, back: true,
+    body: `<div class="lock">🔒 ${k === 'studio' ? 'Gruppo Studio: lo leggono tutti gli utenti' : 'Solo tu e ' + esc(nome) + ' potete leggere questa chat'}</div>
+    <div id="cm" class="chatl"></div>
+    <form id="cf" class="cbar"><label class="cin"><textarea name="t" rows="1" placeholder="Scrivi un messaggio…"></textarea></label><button class="snd" aria-label="Invia">➤</button></form>`
+  });
+  micro($('#cf'));
+  let nPrima = -1;
+  const disegna = () => {
+    const ms = S.chat.msgs.filter(m => chatKey(m) === k);
+    let giorno = '', h = '';
+    ms.forEach(m => {
+      const g = new Date(m.creato_il).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+      if (g !== giorno) { giorno = g; h += `<div class="day">${esc(g === new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }) ? 'Oggi' : g)}</div>`; }
+      const mio = m.mittente === me.id;
+      h += `<div class="msg ${mio ? 'out' : 'in'}">${!mio && (k === 'studio' || true) ? `<small>${esc(m.mittente_nome || '')}</small>` : ''}${esc(m.testo).replace(/\n/g, '<br>')}<span class="o">${esc(oraMsg(m.creato_il))}</span></div>`;
+    });
+    $('#cm').innerHTML = h || '<p class="m" style="text-align:center">Nessun messaggio. Scrivi il primo.</p>';
+    if (ms.length !== nPrima) { nPrima = ms.length; window.scrollTo(0, document.body.scrollHeight); }
+    chatLetto(k);
+  };
+  disegna();
+  const ta = $('#cf textarea');
+  const invia = () => {
+    const t = ta.value.trim(); if (!t) return; ta.value = '';
+    q(sb.from('chat_messaggi').insert({ mittente: me.id, mittente_nome: me.nome || me.username, destinatario: k === 'studio' ? null : k, testo: t }))
+      .then(() => chatCarica()).then(disegna).catch(e => { ta.value = t; avviso('Attenzione', e.message || String(e)); });
+  };
+  $('#cf').onsubmit = e => { e.preventDefault(); invia(); };
+  ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 700) { e.preventDefault(); invia(); } };
+  chatT = setInterval(() => { chatCarica().then(disegna).catch(() => { }); }, 3000);
+};
 
 /* ---------- PAZIENTI ---------- */
 VISTE.pazienti = async () => {
