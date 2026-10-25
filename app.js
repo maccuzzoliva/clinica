@@ -109,7 +109,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v7</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v8</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -161,6 +161,34 @@ async function render() {
   try { await v(...a); } catch (e) { avviso('Attenzione', e.message || String(e)); }
 }
 window.addEventListener('hashchange', () => { chiudi(); render(); });
+
+/* ---------- dettatura vocale (microfono sui campi di testo lungo) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function micro(root) {
+  if (!SR || !root) return;
+  root.querySelectorAll('textarea').forEach(t => {
+    const lab = t.closest('label');
+    if (t.disabled || t.dataset.mic || !lab) return;
+    t.dataset.mic = 1; lab.style.position = 'relative';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mic'; b.setAttribute('aria-label', 'Detta con la voce');
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
+    lab.appendChild(b);
+    let rec = null, on = false;
+    b.onclick = () => {
+      if (on) { rec.stop(); return; }
+      rec = new SR(); rec.lang = 'it-IT'; rec.continuous = true; rec.interimResults = false;
+      rec.onresult = e => {
+        let txt = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) txt += e.results[i][0].transcript;
+        txt = txt.trim();
+        if (txt) { const base = t.value.trimEnd(); t.value = base ? base + ' ' + txt : txt.charAt(0).toUpperCase() + txt.slice(1); t.dispatchEvent(new Event('input', { bubbles: true })); }
+      };
+      rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') avviso('Microfono', 'Il microfono non è disponibile qui. Consenti l\'accesso al microfono oppure usa il microfono della tastiera del telefono.'); };
+      rec.onend = () => { on = false; b.classList.remove('on'); };
+      try { rec.start(); on = true; b.classList.add('on'); } catch (e) { }
+    };
+  });
+}
 
 /* ---------- PAZIENTI ---------- */
 VISTE.pazienti = async () => {
@@ -291,6 +319,7 @@ async function tabClinica(pz) {
       ${can('eliminazione', true) ? `<button class="t d" data-del="${n.id}">Elimina</button>` : ''}</div>`).join('') : '<p class="m">Nessuna nota</p>'}
     <h3>Relazioni cliniche</h3>
     ${rels.length ? rels.map(r => `<a class="card rl" href="#/rel/${r.id}/${id}"><b>Relazione ${esc((r.tipo || '').toLowerCase())}</b><div class="m">${esc(fData(r.data_relazione))}${r.medico ? ' · ' + esc(r.medico) : ''}${r.diagnosi ? ' · ' + esc(r.diagnosi.split('\n')[0].slice(0, 40)) : ''}</div></a>`).join('') : '<p class="m">Nessuna relazione</p>'}`;
+  micro($('#tc'));
   if (mod) {
     $('#fa').onsubmit = e => {
       e.preventDefault(); const d = fobj(e.target);
@@ -360,6 +389,7 @@ VISTE.rel = async (id, pazId) => {
       ${!nuovo && can('eliminazione', true) ? '<button type="button" class="b d" id="del">Elimina relazione</button>' : ''}</div></form>`
   });
   document.querySelectorAll('#f textarea').forEach(t => { t.style.minHeight = '110px'; });
+  micro($('#f'));
   const leggi = () => { const d = fobj($('#f')); return { data_relazione: d.data_relazione, medico: d.medico || '', tipo: d.tipo || 'Altro', motivo: (d.motivo || '').trim(), esame: (d.esame || '').trim(), diagnosi: (d.diagnosi || '').trim(), intervento: (d.intervento || '').trim(), conclusioni: (d.conclusioni || '').trim() }; };
   $('#pdfr').onclick = () => stampaRel(pz, leggi());
   $('#f').onsubmit = e => {
@@ -647,6 +677,7 @@ VISTE.app = async (id, pazPre = '') => {
       <button type="button" class="b o" id="ics">Apple / altri (.ics)</button></div>
       <p class="m">Nel calendario compaiono nome e cognome, tipo e trattamento.</p>`}`
   });
+  micro($('#f'));
   $('#dl').onchange = e => { const l = S.listino.find(x => x.id === e.target.value); if (l) { $('#trt').value = l.nome; $('#f [name=durata_min]').value = l.durata_min; } };
   $('#f').onsubmit = e => {
     e.preventDefault(); const d = fobj(e.target);
