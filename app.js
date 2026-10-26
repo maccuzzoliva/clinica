@@ -111,7 +111,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v10</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v11</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -863,7 +863,7 @@ VISTE.utente = async id => {
     titolo: nuovo ? 'Nuovo utente' : `Utente @${u.username}`, back: true,
     body: `<form id="f">${campo('Username (senza spazi)', 'username', u.username, 'text', `${nuovo ? '' : 'disabled'} autocapitalize="none" autocorrect="off"`)}
       ${campo('Nome e cognome', 'nome', u.nome)}
-      ${campo(nuovo ? 'Password (min. 8 caratteri)' : 'Nuova password (lascia vuoto per non cambiarla)', 'password', '', 'password', 'autocomplete="new-password"')}
+      ${campo(nuovo ? 'Password (min. 10 caratteri)' : 'Nuova password (lascia vuoto per non cambiarla)', 'password', '', 'password', 'autocomplete="new-password"')}
       <label class="chk"><input type="checkbox" name="admin" ${u.ruolo === 'admin' ? 'checked' : ''} ${io ? 'disabled' : ''}>Amministratore (accesso totale e gestione utenti)</label>
       <label class="chk"><input type="checkbox" name="attivo" ${u.attivo ? 'checked' : ''} ${io ? 'disabled' : ''}>Utenza attiva</label>
       <div id="perm">${MODULI.map(([k, et]) => `<label class="f">${esc(et)}${k === 'eliminazione'
@@ -879,9 +879,9 @@ VISTE.utente = async id => {
     const permessi = {};
     MODULI.forEach(([k]) => { const v = d['p_' + k]; permessi[k] = k === 'eliminazione' ? (v === 'Sì' ? 'edit' : 'none') : { Nessuno: 'none', Lettura: 'view', Modifica: 'edit' }[v] || 'none'; });
     const ruolo = d.admin ? 'admin' : 'staff', pw = d.password || '';
-    if (nuovo && (!/^[a-z0-9._-]{3,30}$/.test((d.username || '').trim().toLowerCase()) || pw.length < 8))
-      return avviso('Attenzione', 'Username (3-30 caratteri: lettere, numeri . _ -) e password di almeno 8 caratteri.');
-    if (!nuovo && pw && pw.length < 8) return avviso('Attenzione', 'La password deve avere almeno 8 caratteri.');
+    if (nuovo && (!/^[a-z0-9._-]{3,30}$/.test((d.username || '').trim().toLowerCase()) || pw.length < 10))
+      return avviso('Attenzione', 'Username (3-30 caratteri: lettere, numeri . _ -) e password di almeno 10 caratteri.');
+    if (!nuovo && pw && pw.length < 10) return avviso('Attenzione', 'La password deve avere almeno 10 caratteri.');
     ok(async () => {
       if (nuovo) {
         await gestioneUtenti({ azione: 'crea', username: d.username.trim().toLowerCase(), password: pw, nome: d.nome.trim(), ruolo, permessi });
