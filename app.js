@@ -10,7 +10,7 @@ const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY,
 const DOMINIO = 'clinica.local';
 const MODULI = [
   ['pazienti', 'Anagrafica pazienti'], ['clinica', 'Anamnesi e note cliniche'], ['foto', 'Foto prima/dopo'],
-  ['agenda', 'Agenda'], ['listino', 'Listino'], ['conti', 'Preventivi e pagamenti'], ['eliminazione', 'Eliminare dati']
+  ['agenda', 'Agenda'], ['listino', 'Listino'], ['conti', 'Preventivi e pagamenti'], ['magazzino', 'Magazzino e impianti'], ['eliminazione', 'Eliminare dati']
 ];
 
 /* ---------- utilità ---------- */
@@ -93,6 +93,7 @@ function schermo({ titolo, back = false, azioni = '', nav = null, body }) {
     <a href="#/pazienti" class="${nav === 'pazienti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.8a3.4 3.4 0 010 6.4M18.5 14.8c1.8.7 2.8 2.3 3 4.7"/></svg></b>Pazienti</a>
     ${can('agenda') ? `<a href="#/agenda" class="${nav === 'agenda' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></b>Agenda</a>` : ''}
     <a href="#/chat" class="${nav === 'chat' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg><i class="chbd" hidden></i></b>Chat</a>
+    ${can('magazzino') ? `<a href="#/magazzino" class="${nav === 'magazzino' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5L12 4l8.5 4.5v8L12 21l-8.5-4.5z"/><path d="M3.5 8.5L12 13l8.5-4.5M12 13v8"/></svg></b>Magazzino</a>` : ''}
     ${can('listino') ? `<a href="#/listino" class="${nav === 'listino' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/></svg></b>Listino</a>` : ''}
     ${me.ruolo === 'admin' ? `<a href="#/utenti" class="${nav === 'utenti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></b>Utenti</a>` : ''}
     <button id="esci"><b style="display:block"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4M15 8l4 4-4 4M19 12H9"/></svg></b>Esci</button></div></nav>` : '';
@@ -111,7 +112,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v11</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v13</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -360,6 +361,8 @@ VISTE.paziente = async (id, tab = 'scheda') => {
   if (can('clinica')) tabs.push(['clinica', 'Clinica']);
   if (can('foto')) tabs.push(['foto', 'Foto']);
   if (can('conti')) tabs.push(['conti', 'Conti']);
+  if (can('magazzino')) tabs.push(['impianti', 'Impianti']);
+  if (me.ruolo === 'admin') tabs.push(['storico', 'Storico']);
   if (!tabs.some(t => t[0] === tab)) tab = 'scheda';
   schermo({
     titolo: 'Paziente', back: true, azioni: '<button class="t" id="pdf">PDF / Stampa</button>',
@@ -369,8 +372,21 @@ VISTE.paziente = async (id, tab = 'scheda') => {
   });
   $('#pdf').onclick = () => ok(() => stampa(id));
   log('apri_paziente', id);
-  await ({ scheda: tabScheda, clinica: tabClinica, foto: tabFoto, conti: tabConti }[tab])(pz);
+  await ({ scheda: tabScheda, clinica: tabClinica, foto: tabFoto, conti: tabConti, impianti: tabImpianti, storico: tabStorico }[tab])(pz);
 };
+
+const STO_T = { pazienti: 'anagrafica', anamnesi: 'anamnesi', note_cliniche: 'nota clinica', foto: 'foto', appuntamenti: 'appuntamento', preventivi: 'preventivo', pagamenti: 'pagamento', relazioni: 'relazione' };
+const STO_A = { insert: 'ha creato', update: 'ha modificato', delete: 'ha eliminato' };
+async function tabStorico(pz) {
+  $('#tc').innerHTML = '<p class="m">Caricamento…</p>';
+  let l = [];
+  try { l = await q(sb.from('storico').select('*').eq('paziente_id', pz.id).order('creato_il', { ascending: false }).limit(300)); }
+  catch (e) { $('#tc').innerHTML = '<p class="warn">Storico non disponibile: esegui l\'aggiornamento del database. ' + esc(e.message) + '</p>'; return; }
+  $('#tc').innerHTML = `<p class="m" style="font-size:12px">🔒 Visibile solo all'amministratore. Non si può modificare.</p>` + (l.length ? l.map(x => {
+    const d = new Date(x.creato_il);
+    return `<div class="sto"><div class="sd">${esc(d.toLocaleDateString('it-IT'))}<br>${esc(oraMsg(x.creato_il))}</div><div><b>${esc(x.utente_nome || 'Utente')}</b> ${esc(STO_A[x.azione] || x.azione)} ${esc(STO_T[x.tabella] || x.tabella)}${x.dettaglio ? `<small>${esc(x.dettaglio.replace(/_/g, ' '))}</small>` : ''}</div></div>`;
+  }).join('') : '<p class="m">Nessuna modifica registrata.</p>');
+}
 
 function tabScheda(pz) {
   $('#tc').innerHTML = `${kv('Data di nascita', esc(fData(pz.data_nascita)))}${kv('Sesso', esc(pz.sesso))}${kv('Codice fiscale', esc(pz.codice_fiscale))}
@@ -799,6 +815,159 @@ VISTE.app = async (id, pazPre = '') => {
     await q(sb.from('appuntamenti').delete().eq('id', id));
     S.appuntamenti = S.appuntamenti.filter(x => x.id !== id); history.back();
   }));
+};
+
+/* ---------- MAGAZZINO E IMPIANTI ---------- */
+const MAG_CAT = ['Protesi', 'Filler', 'Fili', 'Altro'];
+const giorniA = d => Math.round((new Date(d + 'T00:00:00') - new Date(oggiISO() + 'T00:00:00')) / 864e5);
+const magStato = (art, lotti) => {
+  const mie = lotti.filter(l => l.articolo_id === art.id && l.quantita > 0);
+  const qta = mie.reduce((s, l) => s + l.quantita, 0);
+  const scad = mie.filter(l => l.scadenza).sort((x, y) => x.scadenza.localeCompare(y.scadenza))[0];
+  const gg = scad ? giorniA(scad.scadenza) : null;
+  return { mie, qta, scad, gg, bassa: art.scorta_min > 0 && qta < art.scorta_min, inScad: gg !== null && gg <= 30 };
+};
+
+VISTE.magazzino = async (cat = '') => {
+  if (!can('magazzino')) return go('#/pazienti');
+  const mod = can('magazzino', true);
+  schermo({ titolo: 'Magazzino', nav: 'magazzino', body: '<p class="m">Caricamento…</p>' });
+  let art, lotti;
+  try { [art, lotti] = await Promise.all([q(sb.from('mag_articoli').select('*').order('categoria').order('nome')), q(sb.from('mag_lotti').select('*'))]); }
+  catch (e) { return schermo({ titolo: 'Magazzino', nav: 'magazzino', body: '<p class="warn">Magazzino non disponibile: esegui l\'aggiornamento del database. ' + esc(e.message) + '</p>' }); }
+  const cats = [...new Set([...MAG_CAT, ...art.map(x => x.categoria).filter(Boolean)])];
+  const lista = art.filter(x => !cat || x.categoria === cat);
+  schermo({
+    titolo: 'Magazzino', nav: 'magazzino',
+    body: `<div class="chips seg mfl"><a class="${!cat ? 'on' : ''}" href="#/magazzino">Tutti</a>${cats.map(c => `<a class="${c === cat ? 'on' : ''}" href="#/magazzino/${encodeURIComponent(c)}">${esc(c)}</a>`).join('')}</div>
+    ${lista.length ? lista.map(x => {
+      const s = magStato(x, lotti);
+      return `<a class="mg ${s.gg !== null && s.gg < 0 ? 'ex' : s.inScad ? 'ex' : s.bassa ? 'lw' : ''}" href="#/articolo/${x.id}"><span class="g"><b>${esc(x.nome)}</b>
+        <small>${esc(x.produttore || '')}${x.produttore ? ' · ' : ''}${s.mie.length} ${s.mie.length === 1 ? 'lotto' : 'lotti'}${s.scad ? ' · scade ' + esc(fData(s.scad.scadenza)) : ''}</small>
+        ${s.gg !== null && s.gg < 0 ? '<i class="tg r">Lotto scaduto</i>' : s.inScad ? `<i class="tg r">In scadenza tra ${s.gg} giorni</i>` : ''}${s.bassa ? `<i class="tg a">Sotto scorta minima (${x.scorta_min})</i>` : ''}</span>
+        <span class="qn">${s.qta}<small>${esc(x.unita || 'pezzi')}</small></span></a>`;
+    }).join('') : '<p class="m">Nessun articolo. ' + (mod ? 'Aggiungi il primo con il pulsante +.' : '') + '</p>'}
+    <h3>Richiamo di lotto</h3><p class="m" style="font-size:12.5px;margin-top:0">Cerca un lotto o un seriale: vedi tutte le pazienti che lo hanno ricevuto.</p>
+    <input id="rl" placeholder="Es. MN-2026-04417" autocomplete="off"><div id="rlr"></div>
+    ${mod ? '<button class="fab" id="nuovo" aria-label="Nuovo articolo">+</button>' : ''}`
+  });
+  if ($('#nuovo')) $('#nuovo').onclick = () => go('#/articolo/new');
+  let tm;
+  $('#rl').oninput = e => {
+    clearTimeout(tm); const v = e.target.value.trim().replace(/[%,()]/g, '');
+    tm = setTimeout(async () => {
+      if (v.length < 3) { $('#rlr').innerHTML = ''; return; }
+      try {
+        const r = await q(sb.from('impianti').select('*').or(`lotto.ilike.%${v}%,seriale.ilike.%${v}%`).order('data_impianto', { ascending: false }).limit(100));
+        $('#rlr').innerHTML = r.length ? r.map(i => { const p = S.pazienti.find(x => x.id === i.paziente_id);
+          return `<a class="card" href="#/paziente/${esc(i.paziente_id)}/impianti"><b>${p ? esc(p.cognome + ' ' + p.nome) : 'Paziente eliminato'}</b><div class="m">${esc(i.articolo_nome)} · lotto ${esc(i.lotto)} · ${esc(fData(i.data_impianto))}${p && p.telefono ? ' · ' + esc(p.telefono) : ''}</div></a>`; }).join('')
+          : '<p class="m">Nessun impianto con questo lotto.</p>';
+      } catch (er) { $('#rlr').innerHTML = '<p class="warn">' + esc(er.message) + '</p>'; }
+    }, 300);
+  };
+};
+
+VISTE.articolo = async id => {
+  if (!can('magazzino')) return go('#/pazienti');
+  const mod = can('magazzino', true), nuovo = id === 'new';
+  let x = { nome: '', categoria: 'Protesi', produttore: '', scorta_min: 0, unita: 'pezzi' }, lotti = [];
+  if (!nuovo) {
+    x = (await q(sb.from('mag_articoli').select('*').eq('id', id)))[0];
+    if (!x) return schermo({ titolo: 'Articolo', back: true, body: '<p>Articolo non trovato</p>' });
+    lotti = await q(sb.from('mag_lotti').select('*').eq('articolo_id', id).order('scadenza'));
+  }
+  schermo({
+    titolo: nuovo ? 'Nuovo articolo' : 'Articolo', back: true,
+    body: `<form id="f"><fieldset style="border:0;padding:0;margin:0" ${mod ? '' : 'disabled'}>${campo('Nome (modello, misura)', 'nome', x.nome, 'text', 'required')}
+      <label class="f">Categoria${scelta('categoria', MAG_CAT, x.categoria)}</label>${campo('Produttore', 'produttore', x.produttore)}
+      <div class="grid2">${campo('Scorta minima', 'scorta_min', x.scorta_min, 'number', 'min="0"')}${campo('Unità', 'unita', x.unita)}</div></fieldset>
+      ${mod ? `<div class="row"><button class="b">Salva</button>${!nuovo ? '<button type="button" class="b d" id="del">Elimina articolo</button>' : ''}</div>` : ''}</form>
+    ${nuovo ? '' : `<h3>Lotti</h3>${lotti.length ? lotti.map(l => `<div class="card lot"><div><b>${esc(l.lotto)}</b><div class="m">${l.scadenza ? 'scade ' + esc(fData(l.scadenza)) : 'senza scadenza'}${l.scadenza && giorniA(l.scadenza) < 0 ? ' · <span class="warn">scaduto</span>' : ''}</div></div><div class="qn">${l.quantita}</div>
+      ${mod ? `<button class="t d" data-dl="${l.id}">Elimina</button>` : ''}</div>`).join('') : '<p class="m">Nessun lotto: registra un carico.</p>'}
+    ${mod ? `<h3>Carico merce</h3><form id="fc"><div class="grid2">${campo('Lotto', 'lotto', '', 'text', 'required')}${campo('Quantità', 'quantita', 1, 'number', 'min="1" required')}</div>${campo('Scadenza', 'scadenza', '', 'date')}<div class="row"><button class="b o">Aggiungi lotto</button></div></form>` : ''}`}`
+  });
+  if (!mod) return;
+  $('#f').onsubmit = e => {
+    e.preventDefault(); const d = fobj(e.target);
+    const rec = { nome: d.nome.trim(), categoria: d.categoria || 'Altro', produttore: (d.produttore || '').trim(), scorta_min: parseInt(d.scorta_min) || 0, unita: (d.unita || 'pezzi').trim() || 'pezzi' };
+    ok(async () => {
+      if (nuovo) { const r = await q(sb.from('mag_articoli').insert(rec).select().single()); history.replaceState(null, '', '#/articolo/' + r.id); render(); }
+      else { await q(sb.from('mag_articoli').update(rec).eq('id', id)); indietro(); }
+    });
+  };
+  if ($('#fc')) $('#fc').onsubmit = e => {
+    e.preventDefault(); const d = fobj(e.target);
+    ok(async () => { await q(sb.from('mag_lotti').insert({ articolo_id: id, lotto: d.lotto.trim(), quantita: parseInt(d.quantita) || 1, scadenza: d.scadenza || null })); render(); });
+  };
+  document.querySelectorAll('[data-dl]').forEach(b => b.onclick = () => conferma('Eliminare il lotto?', 'Gli impianti già registrati restano nelle schede.', () => ok(async () => { await q(sb.from('mag_lotti').delete().eq('id', b.dataset.dl)); render(); })));
+  const del = $('#del');
+  if (del) del.onclick = () => conferma('Eliminare l\'articolo?', 'Verranno eliminati anche i suoi lotti. Gli impianti già registrati restano nelle schede.', () => ok(async () => { await q(sb.from('mag_articoli').delete().eq('id', id)); indietro(); }));
+};
+
+const impHtml = (pz, l) => `<div class="rel"><div class="hd"><img src="${LOGO}" alt=""><h1>PROAESTHETICS</h1><p>STUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA</p></div>
+  <h2>SCHEDA IMPIANTO / DISPOSITIVO</h2>
+  <div class="meta"><div><b>Paziente:</b> ${esc(pz.cognome)} ${esc(pz.nome)}<br>${pz.data_nascita ? `<b>Nato/a il:</b> ${esc(fData(pz.data_nascita))}<br>` : ''}${pz.codice_fiscale ? `<b>Cod. fiscale:</b> ${esc(pz.codice_fiscale)}` : ''}</div>
+  <div style="text-align:right"><b>Emessa il:</b> ${esc(fData(oggiISO()))}</div></div>
+  <table class="tb"><tr><th>Dispositivo</th><th>Lato</th><th>Produttore</th><th>Lotto</th><th>Seriale</th><th>Scadenza</th><th>Impianto</th></tr>
+  ${l.map(i => `<tr><td>${esc(i.articolo_nome)}</td><td>${esc(i.lato)}</td><td>${esc(i.produttore)}</td><td>${esc(i.lotto)}</td><td>${esc(i.seriale)}</td><td>${esc(fData(i.scadenza))}</td><td>${esc(fData(i.data_impianto))}${i.medico ? '<br>' + esc(i.medico) : ''}</td></tr>`).join('')}</table>
+  <p style="margin-top:14px;font-size:11.5px">Conservare questa scheda. In caso di richiamo del produttore o di controlli futuri, comunicare i dati di lotto e seriale.</p>
+  <div class="fir"><div>Messina, ${esc(fData(oggiISO()))}</div><div class="s">Firma e timbro del medico</div></div>
+  <div class="ft">STUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA</div></div>`;
+
+async function tabImpianti(pz) {
+  const mod = can('magazzino', true);
+  let l = [];
+  try { l = await q(sb.from('impianti').select('*').eq('paziente_id', pz.id).order('data_impianto', { ascending: false })); }
+  catch (e) { $('#tc').innerHTML = '<p class="warn">Impianti non disponibili: esegui l\'aggiornamento del database. ' + esc(e.message) + '</p>'; return; }
+  $('#tc').innerHTML = `<h3 style="margin-top:0">Impianti e materiali</h3>
+    ${l.length ? l.map(i => `<div class="imp"><b>${esc(i.articolo_nome)}</b>${i.lato ? ' — ' + esc(i.lato.toLowerCase()) : ''}<br>${esc(i.produttore)}${i.produttore ? ' · ' : ''}Lotto <b>${esc(i.lotto)}</b><br>${i.seriale ? 'Seriale ' + esc(i.seriale) : ''}${i.scadenza ? ' · scad. ' + esc(fData(i.scadenza)) : ''}
+      <small class="m">Impiantata il ${esc(fData(i.data_impianto))}${i.medico ? ' · ' + esc(i.medico) : ''}</small>${mod ? `<button class="t d" data-di="${i.id}">Elimina</button>` : ''}</div>`).join('') : '<p class="m">Nessun impianto registrato</p>'}
+    <div class="row">${mod ? `<a class="b" href="#/impianto/${pz.id}">+ Aggiungi impianto</a>` : ''}${l.length ? '<button class="b o" id="imppdf">Scheda impianto (PDF)</button>' : ''}</div>`;
+  if ($('#imppdf')) $('#imppdf').onclick = async () => {
+    const p = $('#print'); p.innerHTML = impHtml(pz, l);
+    await Promise.all([...p.querySelectorAll('img')].map(i => i.complete ? 0 : new Promise(x => { i.onload = i.onerror = x; })));
+    const t = document.title; document.title = `Scheda impianto ${pz.cognome} ${pz.nome}`; window.print();
+    setTimeout(() => { document.title = t; p.innerHTML = ''; }, 1500);
+  };
+  document.querySelectorAll('[data-di]').forEach(b => b.onclick = () => conferma('Eliminare l\'impianto?', 'Il pezzo viene riaccreditato al magazzino.', () => ok(async () => {
+    await q(sb.from('impianti').delete().eq('id', b.dataset.di)); await tabImpianti(pz);
+  })));
+}
+
+VISTE.impianto = async pazId => {
+  if (!can('magazzino', true)) return go('#/pazienti');
+  const pz = S.pazienti.find(x => x.id === pazId);
+  if (!pz) return schermo({ titolo: 'Impianto', back: true, body: '<p>Paziente non trovato</p>' });
+  const [art, lotti] = await Promise.all([q(sb.from('mag_articoli').select('*').order('categoria').order('nome')), q(sb.from('mag_lotti').select('*').order('scadenza'))]);
+  const disp = art.filter(x => lotti.some(l => l.articolo_id === x.id && l.quantita > 0));
+  schermo({
+    titolo: 'Nuovo impianto', back: true,
+    body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b></p>
+    ${disp.length ? `<form id="f"><label class="f">Dal magazzino<select name="art" required><option value="">Scegli…</option>${disp.map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select></label>
+      <label class="f">Lotto<select name="lot" required><option value="">Scegli prima l'articolo</option></select></label>
+      <label class="f">Lato${scelta('lato', ['Destro', 'Sinistro', 'Non applicabile'], 'Destro')}</label>
+      ${campo('Numero di serie', 'seriale', '')}
+      <div class="grid2">${campo('Data impianto', 'data_impianto', oggiISO(), 'date', 'required')}<label class="f">Medico<select name="medico"><option value="">—</option>${REL_MEDICI.map(m => `<option ${(pz.medici || '').includes(m) ? 'selected' : ''}>${m}</option>`).join('')}</select></label></div>
+      <div class="okb" id="info" hidden></div><div class="row"><button class="b">Salva impianto</button></div></form>` : '<p class="m">Nessun articolo disponibile nel magazzino. Registra prima un carico.</p>'}`
+  });
+  if (!disp.length) return;
+  const sa = $('#f [name=art]'), sl = $('#f [name=lot]'), info = $('#info');
+  sa.onchange = () => {
+    const ls = lotti.filter(l => l.articolo_id === sa.value && l.quantita > 0);
+    sl.innerHTML = ls.length ? ls.map(l => `<option value="${l.id}">${esc(l.lotto)}${l.scadenza ? ' · scad. ' + esc(fData(l.scadenza)) : ''} · ${l.quantita} disp.</option>`).join('') : '<option value="">Nessun lotto</option>';
+    sl.onchange();
+  };
+  sl.onchange = () => { const l = lotti.find(x => x.id === sl.value); info.hidden = !l; if (l) info.textContent = `Verrà scaricato 1 pezzo dal magazzino (restano ${l.quantita - 1})`; };
+  $('#f').onsubmit = e => {
+    e.preventDefault(); const d = fobj(e.target);
+    const a = art.find(x => x.id === d.art), l = lotti.find(x => x.id === d.lot);
+    if (!a || !l) return avviso('Attenzione', 'Scegli articolo e lotto.');
+    ok(async () => {
+      await q(sb.from('impianti').insert({ paziente_id: pazId, articolo_id: a.id, lotto_id: l.id, articolo_nome: a.nome, produttore: a.produttore || '', lotto: l.lotto, seriale: (d.seriale || '').trim(), scadenza: l.scadenza || null,
+        lato: d.lato || '', data_impianto: d.data_impianto, medico: d.medico || '', autore_nome: me.nome || me.username }));
+      log('nuovo_impianto', pazId); indietro();
+    });
+  };
 };
 
 /* ---------- LISTINO ---------- */
