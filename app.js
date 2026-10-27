@@ -112,7 +112,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v13</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v14</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -322,10 +322,13 @@ VISTE.pform = async id => {
     titolo: nuovo ? 'Nuovo paziente' : 'Modifica paziente', back: true,
     body: `<form id="f">
       ${campo('Cognome', 'cognome', p.cognome, 'text', 'required')}${campo('Nome', 'nome', p.nome, 'text', 'required')}
-      ${campo('Data di nascita', 'data_nascita', p.data_nascita || '', 'date')}
+      ${campo('Data di nascita', 'data_nascita', p.data_nascita || '', 'date')}${campo('Luogo di nascita', 'luogo_nascita', p.luogo_nascita)}
       <label class="f">Sesso${scelta('sesso', ['F', 'M', 'Altro'], p.sesso || '')}</label>
       ${campo('Codice fiscale', 'codice_fiscale', p.codice_fiscale, 'text', 'autocapitalize="characters"')}
-      ${campo('Telefono', 'telefono', p.telefono, 'tel')}${campo('Email', 'email', p.email, 'email')}${campo('Indirizzo', 'indirizzo', p.indirizzo)}
+      ${campo('Cellulare', 'telefono', p.telefono, 'tel')}${campo('Telefono fisso (domicilio)', 'telefono_fisso', p.telefono_fisso, 'tel')}${campo('Email', 'email', p.email, 'email')}${campo('Indirizzo', 'indirizzo', p.indirizzo)}
+      <div class="grid2">${campo('Stato civile', 'stato_civile', p.stato_civile, 'text', 'list="stciv"')}${campo('Professione', 'professione', p.professione)}</div>
+      <datalist id="stciv"><option>Celibe/Nubile</option><option>Coniugato/a</option><option>Convivente</option><option>Separato/a</option><option>Divorziato/a</option><option>Vedovo/a</option></datalist>
+      <div class="grid2">${campo('N° registro', 'n_reg', p.n_reg)}${campo('Data e ora ricovero', 'data_ricovero', dtLocal(p.data_ricovero), 'datetime-local')}</div>
       <div class="f" style="margin-top:12px">Medico</div>
       <label class="chk" style="margin:6px 0"><input type="checkbox" name="m_delia" ${(p.medici || '').includes('Prof. Delia') ? 'checked' : ''}>Prof. Delia</label>
       <label class="chk" style="margin:6px 0"><input type="checkbox" name="m_micieli" ${(p.medici || '').includes('Dott. Micieli') ? 'checked' : ''}>Dott. Micieli</label>
@@ -340,7 +343,7 @@ VISTE.pform = async id => {
     const rec = {
       nome: d.nome.trim(), cognome: d.cognome.trim(), data_nascita: d.data_nascita || null, sesso: d.sesso || '',
       codice_fiscale: (d.codice_fiscale || '').trim().toUpperCase(), telefono: (d.telefono || '').trim(), email: (d.email || '').trim(),
-      indirizzo: (d.indirizzo || '').trim(), medici: [d.m_delia ? 'Prof. Delia' : '', d.m_micieli ? 'Dott. Micieli' : ''].filter(Boolean).join(', '),
+      indirizzo: (d.indirizzo || '').trim(), luogo_nascita: (d.luogo_nascita || '').trim(), telefono_fisso: (d.telefono_fisso || '').trim(), stato_civile: (d.stato_civile || '').trim(), professione: (d.professione || '').trim(), n_reg: (d.n_reg || '').trim(), data_ricovero: d.data_ricovero ? new Date(d.data_ricovero).toISOString() : null, medici: [d.m_delia ? 'Prof. Delia' : '', d.m_micieli ? 'Dott. Micieli' : ''].filter(Boolean).join(', '),
       consenso_privacy: !!d.consenso_privacy, consenso_informato: !!d.consenso_informato,
       consenso_data: d.consenso_informato ? (d.consenso_data || oggiISO()) : (d.consenso_data || null)
     };
@@ -359,6 +362,7 @@ VISTE.paziente = async (id, tab = 'scheda') => {
   if (!pz) return schermo({ titolo: 'Paziente', back: true, body: '<p>Paziente non trovato</p>' });
   const tabs = [['scheda', 'Scheda']];
   if (can('clinica')) tabs.push(['clinica', 'Clinica']);
+  if (can('clinica')) tabs.push(['documenti', 'Documenti']);
   if (can('foto')) tabs.push(['foto', 'Foto']);
   if (can('conti')) tabs.push(['conti', 'Conti']);
   if (can('magazzino')) tabs.push(['impianti', 'Impianti']);
@@ -372,10 +376,10 @@ VISTE.paziente = async (id, tab = 'scheda') => {
   });
   $('#pdf').onclick = () => ok(() => stampa(id));
   log('apri_paziente', id);
-  await ({ scheda: tabScheda, clinica: tabClinica, foto: tabFoto, conti: tabConti, impianti: tabImpianti, storico: tabStorico }[tab])(pz);
+  await ({ scheda: tabScheda, clinica: tabClinica, documenti: tabDocumenti, foto: tabFoto, conti: tabConti, impianti: tabImpianti, storico: tabStorico }[tab])(pz);
 };
 
-const STO_T = { pazienti: 'anagrafica', anamnesi: 'anamnesi', note_cliniche: 'nota clinica', foto: 'foto', appuntamenti: 'appuntamento', preventivi: 'preventivo', pagamenti: 'pagamento', relazioni: 'relazione' };
+const STO_T = { pazienti: 'anagrafica', anamnesi: 'anamnesi', note_cliniche: 'nota clinica', foto: 'foto', appuntamenti: 'appuntamento', preventivi: 'preventivo', pagamenti: 'pagamento', relazioni: 'relazione', consensi: 'consenso informato', istruzioni_postop: 'istruzioni post-operatorie', mag_articoli: 'articolo', impianti: 'impianto' };
 const STO_A = { insert: 'ha creato', update: 'ha modificato', delete: 'ha eliminato' };
 async function tabStorico(pz) {
   $('#tc').innerHTML = '<p class="m">Caricamento…</p>';
@@ -389,8 +393,9 @@ async function tabStorico(pz) {
 }
 
 function tabScheda(pz) {
-  $('#tc').innerHTML = `${kv('Data di nascita', esc(fData(pz.data_nascita)))}${kv('Sesso', esc(pz.sesso))}${kv('Codice fiscale', esc(pz.codice_fiscale))}
-    ${kv('Telefono', pz.telefono ? `<a href="tel:${esc(pz.telefono)}">${esc(pz.telefono)}</a>` : '')}${kv('Email', esc(pz.email))}${kv('Indirizzo', esc(pz.indirizzo))}
+  $('#tc').innerHTML = `${kv('Data di nascita', esc(fData(pz.data_nascita)))}${pz.luogo_nascita ? kv('Luogo di nascita', esc(pz.luogo_nascita)) : ''}${kv('Sesso', esc(pz.sesso))}${kv('Codice fiscale', esc(pz.codice_fiscale))}
+    ${kv('Cellulare', pz.telefono ? `<a href="tel:${esc(pz.telefono)}">${esc(pz.telefono)}</a>` : '')}${pz.telefono_fisso ? kv('Telefono fisso', `<a href="tel:${esc(pz.telefono_fisso)}">${esc(pz.telefono_fisso)}</a>`) : ''}${kv('Email', esc(pz.email))}${kv('Indirizzo', esc(pz.indirizzo))}
+    ${pz.stato_civile ? kv('Stato civile', esc(pz.stato_civile)) : ''}${pz.professione ? kv('Professione', esc(pz.professione)) : ''}${pz.n_reg ? kv('N° registro', esc(pz.n_reg)) : ''}${pz.data_ricovero ? kv('Ricovero', esc(dataOra(pz.data_ricovero))) : ''}
     ${kv('Medico', esc(pz.medici))}
     ${kv('Privacy (GDPR)', pz.consenso_privacy ? 'Informativa firmata' : '<span class="warn">NON firmata</span>')}
     ${kv('Consenso informato', pz.consenso_informato ? 'Firmato il ' + esc(fData(pz.consenso_data)) : '<span class="warn">NON firmato</span>')}
@@ -427,6 +432,7 @@ async function tabClinica(pz) {
       ${area('Patologie', 'patologie', a.patologie).replace('<textarea', `<textarea ${dis}`)}
       <label class="f">Fumo${scelta('fumatore', ['No', 'Ex', 'Sì'], a.fumatore || '')}</label>
       ${mod ? '<div class="row"><button class="b">Salva anamnesi</button></div>' : ''}</form>
+    <div class="row"><a class="b o" href="#/anam/${id}">Scheda anamnestica completa</a></div>
     <h3>Note cliniche</h3>
     ${mod ? `<form id="fn">${area('Nuova nota', 'testo')}<div class="row"><button class="b" id="addn" disabled style="flex:1">Aggiungi nota</button><a class="b o" id="relb" style="flex:1" href="#/rel/new/${id}">Relazioni Clinica</a></div></form>` : ''}
     ${note.length ? note.map(n => `<div class="card"><div class="m">${esc(fDataOra(n.creato_il))} · ${esc(n.autore_nome)}</div>
@@ -1075,7 +1081,7 @@ async function stampa(id) {
   h.push(`<h1>Scheda paziente</h1><h2>${esc(pz.cognome)} ${esc(pz.nome)}</h2>
     <p class="s">Stampata il ${new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })} da ${esc(me.nome || me.username)}</p>`);
   const r = (e, v) => v ? `<tr><td class="e">${esc(e)}</td><td>${esc(v)}</td></tr>` : '';
-  h.push(`<h3>Anagrafica</h3><table>${r('Data di nascita', fData(pz.data_nascita))}${r('Sesso', pz.sesso)}${r('Codice fiscale', pz.codice_fiscale)}${r('Telefono', pz.telefono)}${r('Medico', pz.medici)}
+  h.push(`<h3>Anagrafica</h3><table>${r('Data di nascita', fData(pz.data_nascita))}${r('Sesso', pz.sesso)}${r('Codice fiscale', pz.codice_fiscale)}${r('Luogo di nascita', pz.luogo_nascita)}${r('Cellulare', pz.telefono)}${r('Telefono fisso', pz.telefono_fisso)}${r('Stato civile', pz.stato_civile)}${r('Professione', pz.professione)}${r('N° registro', pz.n_reg)}${r('Ricovero', pz.data_ricovero ? dataOra(pz.data_ricovero) : '')}${r('Medico', pz.medici)}
     ${r('Email', pz.email)}${r('Indirizzo', pz.indirizzo)}${r('Privacy (GDPR)', pz.consenso_privacy ? 'Informativa firmata' : 'NON firmata')}
     ${r('Consenso informato', pz.consenso_informato ? 'Firmato il ' + fData(pz.consenso_data) : 'NON firmato')}</table>`);
   if (can('clinica')) {
@@ -1111,6 +1117,336 @@ async function stampa(id) {
   window.print();
   setTimeout(() => { document.title = t; p.innerHTML = ''; }, 1500);
 }
+
+/* ================= DOCUMENTI (anagrafica/ricovero, anamnestica, consenso, istruzioni) ================= */
+const docHd = () => `<div class="hd"><img src="${LOGO}" alt=""><h1>PROAESTHETICS</h1><p>STUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA</p><p class="dd">${REL_MEDICI.map(esc).join('  ·  ')}</p></div>`;
+const docMeta = (pz, dx = '') => `<div class="meta"><div><b>Paziente:</b> ${esc(pz.cognome)} ${esc(pz.nome)}<br>${pz.data_nascita ? `<b>Nato/a il:</b> ${esc(fData(pz.data_nascita))}<br>` : ''}${pz.codice_fiscale ? `<b>Cod. fiscale:</b> ${esc(pz.codice_fiscale)}` : ''}</div><div style="text-align:right">${dx}</div></div>`;
+const docFt = () => '<div class="ft">STUDIO PROAESTHETICS CHIRURGIA PLASTICA ED ESTETICA</div>';
+const dtLocal = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : `${isoData(d)}T${isoOra(d)}`; };
+const dataOra = iso => iso ? `${fData(iso)} alle ${oraMsg(iso)}` : '';
+async function stampaDoc(html, titolo) {
+  const p = $('#print'); p.innerHTML = html;
+  await Promise.all([...p.querySelectorAll('img')].map(i => i.complete ? 0 : new Promise(x => { i.onload = i.onerror = x; })));
+  const t = document.title; document.title = titolo; window.print();
+  setTimeout(() => { document.title = t; p.innerHTML = ''; }, 1500);
+}
+async function sha256(t) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+const marca = (v, a = 'Sì', b = 'No') => `${v === a ? '☒' : '☐'} ${a} &nbsp; ${v === b ? '☒' : '☐'} ${b}`;
+const sino = (nome, val) => `<div class="chips seg sn2">${['Sì', 'No'].map(o => `<label><input type="radio" name="${nome}" value="${o}" ${val === o ? 'checked' : ''}>${o}</label>`).join('')}</div>`;
+
+/* ---------- firma a dito ---------- */
+function padFirma(cv) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth || 600, h = cv.clientHeight || 190;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const g = cv.getContext('2d'); g.scale(dpr, dpr); g.lineWidth = 2.4; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#111';
+  let giu = false, n = 0, cb = () => {};
+  const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (x) {} giu = true; const [x, y] = pos(e); g.beginPath(); g.moveTo(x, y); g.lineTo(x + 0.1, y + 0.1); g.stroke(); g.beginPath(); g.moveTo(x, y); n++; });
+  cv.addEventListener('pointermove', e => { if (!giu) return; e.preventDefault(); const [x, y] = pos(e); g.lineTo(x, y); g.stroke(); g.beginPath(); g.moveTo(x, y); n++; });
+  const fine = () => { if (giu) { giu = false; cb(); } };
+  cv.addEventListener('pointerup', fine); cv.addEventListener('pointercancel', fine);
+  return { ha: () => n > 8, dati: () => cv.toDataURL('image/png'), pulisci: () => { g.clearRect(0, 0, w, h); n = 0; cb(); }, su: f => { cb = f; } };
+}
+const sigHtml = (id, nota = '') => `<div class="sigbox"><canvas id="${id}"></canvas><span class="sigh">Firma qui con il dito${nota}</span></div><div class="row" style="margin-top:6px"><button type="button" class="t" id="${id}c">Cancella firma</button></div>`;
+
+/* ---------- TAB DOCUMENTI ---------- */
+async function tabDocumenti(pz) {
+  const id = pz.id, mod = can('clinica', true);
+  let cons = [], ist = [], an = [];
+  try {
+    [cons, ist, an] = await Promise.all([
+      q(sb.from('consensi').select('id,intervento,medico,data,firmato_il,firmato_da_nome').eq('paziente_id', id).order('firmato_il', { ascending: false })),
+      q(sb.from('istruzioni_postop').select('id,data,intervento,firma').eq('paziente_id', id).order('data', { ascending: false })),
+      q(sb.from('anamnesi').select('scheda').eq('paziente_id', id))
+    ]);
+  } catch (e) { $('#tc').innerHTML = '<p class="warn">Documenti non disponibili: esegui l\'aggiornamento del database. ' + esc(e.message) + '</p>'; return; }
+  const sc = (an[0] || {}).scheda || {};
+  $('#tc').innerHTML = `<h3 style="margin-top:0">Scheda anagrafica / ricovero</h3>
+    <div class="card dc"><div><b>Dati anagrafici e di ricovero</b><div class="m">${pz.n_reg ? 'N° registro ' + esc(pz.n_reg) + ' · ' : ''}${pz.data_ricovero ? 'Ricovero ' + esc(dataOra(pz.data_ricovero)) : 'Ricovero non indicato'}</div></div>
+      <div class="dca">${can('pazienti', true) ? `<a class="t" href="#/pform/${id}">Modifica</a>` : ''}<button class="t" id="dpa">PDF</button></div></div>
+    <h3>Scheda anamnestica</h3>
+    <a class="card rl" href="#/anam/${id}"><b>Scheda anamnestica</b><div class="m">${sc.agg ? 'Compilata il ' + esc(fData(sc.agg)) : 'Da compilare'}</div></a>
+    <h3>Consenso informato</h3>
+    ${cons.length ? cons.map(c => `<a class="card rl" href="#/cons/${c.id}"><b>${esc(c.intervento || 'Consenso informato')}</b><div class="m"><span class="okt">Firmato</span> ${esc(dataOra(c.firmato_il))}${c.firmato_da_nome ? ' · ' + esc(c.firmato_da_nome) : ''}</div></a>`).join('') : '<p class="m">Nessun consenso firmato</p>'}
+    ${mod ? `<div class="row"><a class="b" href="#/cons/new/${id}">+ Nuovo consenso</a></div>` : ''}
+    <h3>Istruzioni post-operatorie</h3>
+    ${ist.length ? ist.map(i => `<a class="card rl" href="#/istr/${i.id}"><b>${esc(i.intervento || 'Istruzioni post-operatorie')}</b><div class="m">${esc(fData(i.data))}${i.firma ? ' · <span class="okt">presa visione firmata</span>' : ''}</div></a>`).join('') : '<p class="m">Nessuna lettera di dimissione</p>'}
+    ${mod ? `<div class="row"><a class="b" href="#/istr/new/${id}">+ Nuove istruzioni</a></div>` : ''}`;
+  $('#dpa').onclick = () => ok(async () => {
+    const a = (await q(sb.from('anamnesi').select('*').eq('paziente_id', id)))[0] || {};
+    await stampaDoc(anagHtml(pz, a), `Scheda anagrafica ${pz.cognome} ${pz.nome}`);
+  });
+}
+
+/* ---------- SCHEDA ANAGRAFICA / RICOVERO ---------- */
+function anagHtml(pz, a) {
+  const r = (e, v) => `<tr><td class="e">${e}</td><td class="v">${v ? esc(v) : '&nbsp;'}</td></tr>`;
+  return `<div class="rel">${docHd()}<h2>SCHEDA ANAGRAFICA / RICOVERO</h2>
+    <table class="an">${r('N° Reg.', pz.n_reg)}${r('Cognome e nome', `${pz.cognome} ${pz.nome}`)}${r('Sesso', pz.sesso)}
+    ${r('Data di nascita', fData(pz.data_nascita))}${r('Luogo di nascita', pz.luogo_nascita)}${r('Indirizzo', pz.indirizzo)}
+    ${r('Telefono (domicilio)', pz.telefono_fisso)}${r('Cellulare', pz.telefono)}${r('Stato civile', pz.stato_civile)}${r('Professione', pz.professione)}
+    ${r('Codice fiscale', pz.codice_fiscale)}${r('Data e ora ricovero', dataOra(pz.data_ricovero))}
+    ${r('Patologia', a.diagnosi)}${r('Intervento', a.tipo_intervento)}</table>
+    <div class="fir"><div>Messina, ${esc(fData(oggiISO()))}</div><div class="s">Firma del paziente</div></div>${docFt()}</div>`;
+}
+
+/* ---------- SCHEDA ANAMNESTICA ---------- */
+const AN_FAM = ['Cardiovascolari', 'Diabete', 'Tumori', 'Psichiatriche', 'Altre patologie rilevanti'];
+const AN_REM = ['Cardiopatie / Ipertensione', 'Diabete / Dislipidemie', 'Patologie respiratorie (asma, BPCO, apnea notturna)', 'Patologie epatiche (epatiti, cirrosi, enzimi elevati)', 'Malattie infettive (HIV, HBV, HCV, TBC, altre)', 'Patologie renali / urinarie', 'Patologie gastrointestinali (ulcera, reflusso, colon irritabile)', 'Patologie endocrine (tiroide, surreni, ovariche/testicolari)', 'Malattie autoimmuni / reumatologiche', 'Patologie neurologiche / psichiatriche', 'Neoplasie pregresse', 'Altre patologie rilevanti'];
+const AN_GRAV = ['Non applicabile', 'Gravidanza in corso', 'Allattamento'];
+function anamHtml(pz, s) {
+  const f = s.fam || [], r = s.rem || [], al = s.all || {};
+  const rig = (l, o) => `<tr><td>${esc(l)}</td><td class="sn">${marca((o || {}).v)}</td><td>${esc((o || {}).n || '')}</td></tr>`;
+  const bx = v => v && String(v).trim() ? esc(v).replace(/\n/g, '<br>') : '&nbsp;';
+  return `<div class="rel">${docHd()}<h2>SCHEDA ANAMNESTICA</h2>${docMeta(pz, `<b>Data:</b> ${esc(fData(s.agg || oggiISO()))}`)}
+    <h3>Anamnesi familiare</h3><table class="tb"><tr><th>Familiarità per patologie</th><th>Sì / No</th><th>Chi / Note</th></tr>${AN_FAM.map((l, i) => rig(l, f[i])).join('')}</table>
+    <h3>Anamnesi patologica remota</h3><table class="tb"><tr><th>Sistema / Patologia principale</th><th>Sì / No</th><th>Specificare diagnosi</th></tr>${AN_REM.map((l, i) => rig(l, r[i])).join('')}</table>
+    <h3>Interventi chirurgici pregressi</h3><p>${marca((s.chir || {}).v)}${(s.chir || {}).n ? ' → ' + esc(s.chir.n) : ''}</p>
+    <h3>Anestesie precedenti</h3><p>${marca((s.anest || {}).v, 'Nessuna reazione', 'Reazioni avverse')}${(s.anest || {}).n ? ': ' + esc(s.anest.n) : ''}</p>
+    <h3>Gravidanze / Allattamento</h3><p>${AN_GRAV.map(g => `${s.grav === g ? '☒' : '☐'} ${g}`).join(' &nbsp; ')}</p>
+    <h3>Allergie</h3><p>${al.nessuna ? '☒' : '☐'} Nessuna<br>${al.farmaci ? '☒' : '☐'} Farmaci${al.farmaci ? ' → ' + esc(al.farmaci) : ''}<br>${al.alimenti ? '☒' : '☐'} Alimenti${al.alimenti ? ' → ' + esc(al.alimenti) : ''}<br>${al.altro ? '☒' : '☐'} Altro${al.altro ? ' → ' + esc(al.altro) : ''}</p>
+    <h3>Assunzione di farmaci o altre sostanze</h3><p>${marca((s.farm || {}).v)}${(s.farm || {}).n ? ' → ' + esc(s.farm.n).replace(/\n/g, '<br>') : ''}</p>
+    <h3>Fumo e alcool</h3><p>Fumo: ${marca((s.fumo || {}).v)}${(s.fumo || {}).v === 'Sì' && (s.fumo || {}).n ? ' → ' + esc(s.fumo.n) + ' sig/die' : ''}<br>Alcool: ${marca((s.alcool || {}).v)}${(s.alcool || {}).v === 'Sì' && (s.alcool || {}).n ? ' → ' + esc(s.alcool.n) + ' unità/sett' : ''}</p>
+    <h3>Osservazioni cliniche</h3><p>${bx(s.oss)}</p><h3>Note cliniche aggiuntive</h3><p>${bx(s.note)}</p>
+    <div class="fir"><div>Messina, ${esc(fData(s.agg || oggiISO()))}</div><div class="s">Firma del medico</div></div>${docFt()}</div>`;
+}
+VISTE.anam = async pazId => {
+  const pz = S.pazienti.find(x => x.id === pazId), mod = can('clinica', true);
+  if (!pz || !can('clinica')) return go('#/pazienti');
+  const a = (await q(sb.from('anamnesi').select('*').eq('paziente_id', pazId)))[0] || {};
+  const s = a.scheda || {}, f = s.fam || [], r = s.rem || [], al = s.all || {};
+  const blocco = (pre, i, l, o) => `<div class="sn"><div class="sl">${esc(l)}</div>${sino(`${pre}${i}_v`, (o || {}).v)}${campo('Chi / note', `${pre}${i}_n`, (o || {}).n || '')}</div>`;
+  schermo({
+    titolo: 'Scheda anamnestica', back: true,
+    body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b>${pz.data_nascita ? ' · nato/a il ' + esc(fData(pz.data_nascita)) : ''}</p>
+    <form id="f"><fieldset style="border:0;padding:0;margin:0" ${mod ? '' : 'disabled'}>
+    <h3>Anamnesi familiare</h3>${AN_FAM.map((l, i) => blocco('f', i, l, f[i])).join('')}
+    <h3>Anamnesi patologica remota</h3>${AN_REM.map((l, i) => blocco('r', i, l, r[i])).join('')}
+    <h3>Interventi chirurgici pregressi</h3>${sino('chir_v', (s.chir || {}).v)}${area('Quali', 'chir_n', (s.chir || {}).n)}
+    <h3>Anestesie precedenti</h3><div class="chips">${['Nessuna reazione', 'Reazioni avverse'].map(o => `<label><input type="radio" name="anest_v" value="${o}" ${(s.anest || {}).v === o ? 'checked' : ''}>${o}</label>`).join('')}</div>${campo('Reazioni avverse: quali', 'anest_n', (s.anest || {}).n || '')}
+    <h3>Gravidanze / Allattamento</h3>${scelta('grav', AN_GRAV, s.grav || '')}
+    <h3>Allergie</h3><label class="chk"><input type="checkbox" name="al_nessuna" ${al.nessuna ? 'checked' : ''}>Nessuna</label>
+    ${campo('Farmaci', 'al_farmaci', al.farmaci || '')}${campo('Alimenti', 'al_alimenti', al.alimenti || '')}${campo('Altro', 'al_altro', al.altro || '')}
+    <h3>Assunzione di farmaci o altre sostanze</h3>${sino('farm_v', (s.farm || {}).v)}${area('Quali', 'farm_n', (s.farm || {}).n)}
+    <h3>Fumo e alcool</h3><div class="sl">Fumo</div>${sino('fumo_v', (s.fumo || {}).v)}${campo('Sigarette al giorno', 'fumo_n', (s.fumo || {}).n || '', 'text', 'inputmode="numeric"')}
+    <div class="sl">Alcool</div>${sino('alc_v', (s.alcool || {}).v)}${campo('Unità a settimana', 'alc_n', (s.alcool || {}).n || '', 'text', 'inputmode="numeric"')}
+    <h3>Osservazioni cliniche</h3>${area('', 'oss', s.oss)}<h3>Note cliniche aggiuntive</h3>${area('', 'note', s.note)}</fieldset>
+    <div class="row">${mod ? '<button class="b">Salva scheda</button>' : ''}<button type="button" class="b o" id="pdfa">PDF / Stampa</button></div></form>`
+  });
+  document.querySelectorAll('#f textarea').forEach(t => { t.style.minHeight = '90px'; });
+  micro($('#f'));
+  const leggi = () => {
+    const d = fobj($('#f')), t = k => (d[k] || '').trim();
+    const gr = (pre, n) => Array.from({ length: n }, (_, i) => ({ v: d[`${pre}${i}_v`] || '', n: t(`${pre}${i}_n`) }));
+    return {
+      fam: gr('f', AN_FAM.length), rem: gr('r', AN_REM.length), chir: { v: d.chir_v || '', n: t('chir_n') }, anest: { v: d.anest_v || '', n: t('anest_n') },
+      grav: d.grav || '', all: { nessuna: !!d.al_nessuna, farmaci: t('al_farmaci'), alimenti: t('al_alimenti'), altro: t('al_altro') },
+      farm: { v: d.farm_v || '', n: t('farm_n') }, fumo: { v: d.fumo_v || '', n: t('fumo_n') }, alcool: { v: d.alc_v || '', n: t('alc_n') },
+      oss: t('oss'), note: t('note'), agg: oggiISO()
+    };
+  };
+  $('#pdfa').onclick = () => stampaDoc(anamHtml(pz, leggi()), `Scheda anamnestica ${pz.cognome} ${pz.nome}`);
+  $('#f').onsubmit = e => {
+    e.preventDefault(); const sc = leggi();
+    const alle = [sc.all.farmaci && 'Farmaci: ' + sc.all.farmaci, sc.all.alimenti && 'Alimenti: ' + sc.all.alimenti, sc.all.altro && 'Altro: ' + sc.all.altro].filter(Boolean);
+    const pat = sc.rem.map((o, i) => o.v === 'Sì' ? AN_REM[i] + (o.n ? ' (' + o.n + ')' : '') : '').filter(Boolean);
+    const rec = { paziente_id: pazId, scheda: sc, allergie: alle.length ? alle.join('; ') : (sc.all.nessuna ? 'Nessuna' : (a.allergie || '')), patologie: pat.length ? pat.join('; ') : (a.patologie || ''),
+      farmaci: sc.farm.v === 'Sì' ? (sc.farm.n || 'Sì') : (sc.farm.v === 'No' ? '' : (a.farmaci || '')), fumatore: sc.fumo.v === 'Sì' ? 'Sì' : (sc.fumo.v === 'No' ? 'No' : (a.fumatore || '')) };
+    ok(async () => { await q(sb.from('anamnesi').upsert(rec, { onConflict: 'paziente_id' })); log('modifica_anamnesi', pazId); indietro(); });
+  };
+};
+
+/* ---------- CONSENSO INFORMATO ---------- */
+const CONS_MOD = {
+  Generico: '',
+  Mastoplastica: 'asimmetria, alterazioni della sensibilità del capezzolo e della cute, contrattura capsulare, dislocazione o rottura dell\'impianto, cicatrici ipertrofiche, necessità di reintervento',
+  Rinoplastica: 'asimmetrie o irregolarità del dorso nasale, difficoltà respiratoria, alterazioni della sensibilità, cicatrici, risultato estetico diverso dalle aspettative, necessità di ritocco'
+};
+const CONS_ANEST = ['Locale', 'Locale con sedazione', 'Generale'];
+const CONS_D1 = 'Dichiaro di aver letto e compreso il contenuto del presente documento e di aver ricevuto risposta a tutte le mie domande.';
+const CONS_D2 = 'Acconsento al trattamento dei miei dati personali e sanitari e delle fotografie, per le finalità indicate nel presente documento.';
+function consParagrafi(pz, c) {
+  const x = (v, n) => v && String(v).trim() ? String(v).trim() : '_'.repeat(n);
+  const g = b => b + (pz.sesso === 'F' ? 'a' : pz.sesso === 'M' ? 'o' : 'o/a');
+  const M = c.medico ? c.medico : 'Dott./Prof. ' + '_'.repeat(14), I = x(c.intervento, 24);
+  return [
+    `Io sottoscritt${g('')} ${pz.nome} ${pz.cognome}, nat${g('')} a ${x(pz.luogo_nascita, 14)} il ${pz.data_nascita ? fData(pz.data_nascita) : '_'.repeat(10)}, chiedo di essere sottopost${g('')} ad intervento di ${I}. A tale proposito dichiaro che:`,
+    `Ho avuto modo di discutere in maniera chiara ed esauriente le caratteristiche dell'intervento in questione con il ${M}, che mi ha esposto in termini a me pienamente comprensibili le tecniche attualmente disponibili per l'effettuazione dell'intervento da me desiderato e tutte le alternative terapeutiche, inclusa la possibilità di non sottopormi ad intervento chirurgico.`,
+    `Ho avuto ampia e dettagliata spiegazione dei rischi correlati agli interventi chirurgici in generale (con particolare riguardo a: infezione, rischio anestesiologico, ematomi, cicatrizzazione patologica e necrosi) e di quelli specificamente correlati con l'intervento a cui intendo sottopormi: ${x(c.rischi, 30)}.`,
+    `Per ognuno dei rischi correlati all'intervento mi è stata data spiegazione della frequenza con cui si può verificare e delle eventuali terapie a cui potrei avere necessità di sottopormi per il trattamento delle sopravvenute complicanze. Tra queste sono incluse: terapia antibiotica e farmacologia, revisione chirurgica immediata, revisione chirurgica a distanza di tempo.`,
+    `Mi è stato adeguatamente spiegato che durante interventi chirurgici in anestesia locale circostanze del tutto particolari potrebbero richiedere la conversione dell'anestesia locale in anestesia generale. Autorizzo sin d'ora il ${M} ad effettuare questa scelta se ritenuta necessaria per la mia sicurezza durante l'intervento, e sono consapevole che questo potrebbe comportare la necessità di ricovero per una notte.`,
+    `Autorizzo la ripresa e l'archiviazione assieme ai miei dati clinici di fotografie preoperatorie, intraoperatorie e postoperatorie del mio caso. Tale autorizzazione è intesa per i soli fini medico-legali e per gli utilizzi sia scientifici e divulgativi.`,
+    `Mi è stata data ampia spiegazione dei controlli clinici a cui dovrò sottopormi successivamente all'intervento e della loro durata e frequenza nel tempo. Sono consapevole che il mancato rispetto da parte mia dei controlli successivi all'intervento potrebbe compromettere il risultato dell'intervento stesso e/o alterarlo imprevedibilmente.`,
+    `Successivamente alla mia visita con il ${M} ed alla mia discussione con lui, ho avuto tempo più che sufficiente per valutare adeguatamente e con tranquillità le informazioni ricevute, nonché i rischi ed i benefici dell'intervento a cui desidero sottopormi. In conseguenza di quanto dichiarato e del rapporto di piena fiducia instauratosi, autorizzo il ${M} ed i suoi collaboratori ad effettuare l'intervento di ${I}.`,
+    `Da eseguirsi in anestesia ${x(c.anestesia, 20)}.`,
+    `Autorizzo altresì il ${M} all'effettuazione di tutte le eventuali procedure e terapie di urgenza che, a suo giudizio, si dovessero rendere necessarie per la mia sicurezza durante l'intervento chirurgico.`
+  ];
+}
+function consPdf(pz, c) {
+  const par = String(c.testo || '').split('\n\n');
+  return `<div class="rel cons">${docHd()}<h2>CONSENSO INFORMATO ALL'INTERVENTO</h2>${docMeta(pz, `<b>Data:</b> ${esc(fData(c.data))}${c.medico ? `<br><b>Medico:</b> ${esc(c.medico)}` : ''}`)}
+    ${par.map(p => `<p>${esc(p)}</p>`).join('')}
+    <p class="dich">☒ ${esc(CONS_D1)}<br>☒ ${esc(CONS_D2)}</p>
+    <div class="fir2"><div>Luogo: ${esc(c.luogo)}<br>Data: ${esc(fData(c.data))}</div>
+      <div class="sg"><div class="im">${c.firma ? `<img src="${esc(c.firma)}" alt="">` : ''}</div><div class="s">Firma del paziente</div></div>
+      <div class="sg"><div class="im"></div><div class="s">Firma del medico</div></div></div>
+    ${c.firmato_il ? `<div class="aud">Firma elettronica del paziente apposta il ${esc(dataOra(c.firmato_il))} · registrata da ${esc(c.firmato_da_nome || '—')} · impronta del documento ${esc((c.impronta || '').slice(0, 24))}</div>` : ''}${docFt()}</div>`;
+}
+VISTE.cons = async (id, pazId) => {
+  if (id === 'new') return consNuovo(pazId);
+  const c = (await q(sb.from('consensi').select('*').eq('id', id)))[0];
+  if (!c) return schermo({ titolo: 'Consenso', back: true, body: '<p>Consenso non trovato</p>' });
+  const pz = S.pazienti.find(x => x.id === c.paziente_id);
+  if (!pz) return schermo({ titolo: 'Consenso', back: true, body: '<p>Paziente non trovato</p>' });
+  schermo({
+    titolo: 'Consenso informato', back: true,
+    body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b></p>
+      <div class="okb">✓ Firmato il ${esc(dataOra(c.firmato_il))}<br><small>registrato da ${esc(c.firmato_da_nome || '—')} · documento non modificabile</small></div>
+      <div class="cprev">${String(c.testo).split('\n\n').map(p => `<p>${esc(p)}</p>`).join('')}
+        <p class="dich">☒ ${esc(CONS_D1)}<br>☒ ${esc(CONS_D2)}</p></div>
+      <div class="sigimg"><img src="${esc(c.firma)}" alt="Firma del paziente"><small>Firma del paziente · ${esc(c.luogo)}, ${esc(fData(c.data))}</small></div>
+      <p class="m" style="word-break:break-all">Impronta SHA-256: ${esc(c.impronta)}</p>
+      <div class="row"><button class="b" id="pdfc">PDF / Stampa</button>${can('eliminazione', true) ? '<button class="b d" id="del">Elimina</button>' : ''}</div>`
+  });
+  const stp = () => stampaDoc(consPdf(pz, c), `Consenso ${pz.cognome} ${pz.nome}`);
+  $('#pdfc').onclick = stp;
+  const del = $('#del');
+  if (del) del.onclick = () => conferma('Eliminare il consenso?', 'Il documento firmato verrà cancellato. Non si può annullare.', () => ok(async () => {
+    await q(sb.from('consensi').delete().eq('id', id)); log('elimina_consenso', pz.id); indietro();
+  }));
+  if (window._stampaCons === id) { window._stampaCons = null; setTimeout(stp, 300); }
+};
+async function consNuovo(pazId) {
+  const pz = S.pazienti.find(x => x.id === pazId);
+  if (!pz || !can('clinica', true)) return go('#/pazienti');
+  const an = (await q(sb.from('anamnesi').select('tipo_intervento').eq('paziente_id', pazId)))[0] || {};
+  schermo({
+    titolo: 'Consenso informato', back: true,
+    body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b>${pz.data_nascita ? ' · nato/a il ' + esc(fData(pz.data_nascita)) : ''}</p>
+    <form id="f"><label class="f">Modello${scelta('mod', Object.keys(CONS_MOD), 'Generico')}</label>
+      <div class="grid2">${campo('Data', 'data', oggiISO(), 'date', 'required')}${campo('Luogo', 'luogo', 'Messina')}</div>
+      <label class="f">Medico<select name="medico"><option value="">—</option>${REL_MEDICI.map(m => `<option ${(pz.medici || '').includes(m) && !(pz.medici || '').includes(',') ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
+      ${campo('Intervento', 'intervento', an.tipo_intervento || '', 'text', 'required')}
+      <label class="f">Anestesia${scelta('anestesia', CONS_ANEST, 'Locale')}</label>
+      ${area('Rischi specifici dell\'intervento', 'rischi', '')}
+      <h3>Testo del consenso</h3><div class="cprev" id="cprev"></div>
+      <h3>Dichiarazioni del paziente</h3>
+      <label class="chk"><input type="checkbox" name="d1">${esc(CONS_D1)}</label>
+      <label class="chk"><input type="checkbox" name="d2">${esc(CONS_D2)}</label>
+      <h3>Firma del paziente</h3>${sigHtml('sg')}
+      <div class="row"><button class="b" id="sv" disabled>Salva e stampa PDF</button></div>
+      <p class="m">Dopo il salvataggio il consenso non è più modificabile. Registra data, ora e utente.</p></form>`
+  });
+  micro($('#f'));
+  const pad = padFirma($('#sg')), f = $('#f');
+  const leggi = () => { const d = fobj(f); return { data: d.data, luogo: (d.luogo || '').trim() || 'Messina', medico: d.medico || '', intervento: (d.intervento || '').trim(), anestesia: d.anestesia || '', rischi: (d.rischi || '').trim() }; };
+  const agg = () => {
+    const d = fobj(f);
+    $('#cprev').innerHTML = consParagrafi(pz, leggi()).map(p => `<p>${esc(p)}</p>`).join('');
+    $('#sv').disabled = !(d.d1 && d.d2 && pad.ha() && d.intervento.trim());
+  };
+  pad.su(agg); $('#sgc').onclick = () => pad.pulisci();
+  f.addEventListener('input', agg); f.addEventListener('change', e => {
+    if (e.target.name === 'mod') { f.rischi.value = CONS_MOD[e.target.value] || ''; if (!f.intervento.value.trim() && e.target.value !== 'Generico') f.intervento.value = e.target.value.toLowerCase(); }
+    agg();
+  });
+  agg();
+  f.onsubmit = e => {
+    e.preventDefault();
+    ok(async () => {
+      const c = leggi(), testo = consParagrafi(pz, c).join('\n\n'), firma = pad.dati();
+      const impronta = await sha256(`${testo}|${firma}|${pz.id}`);
+      const r = await q(sb.from('consensi').insert({ paziente_id: pazId, ...c, testo, firma, impronta, firmato_da_nome: me.nome || me.username }).select().single());
+      S.pazienti = await q(sb.from('pazienti').select('*').order('cognome').order('nome'));
+      log('firma_consenso', pazId);
+      window._stampaCons = r.id; history.replaceState(null, '', `#/cons/${r.id}`); render();
+    });
+  };
+}
+
+/* ---------- ISTRUZIONI POST-OPERATORIE ---------- */
+function istrHtml(pz, i) {
+  const b = (v, pt) => v !== null && v !== undefined && String(v).trim() !== '' ? `<u>${esc(v)}</u>` : pt;
+  const dt = d => d ? `<u>${esc(fData(d))}</u>` : '......./......../..........';
+  const ti = pz.sesso === 'F' ? 'Sig.ra' : pz.sesso === 'M' ? 'Sig.' : 'Sig./Sig.ra';
+  return `<div class="rel ist">${docHd()}
+    <p><b>${ti}</b> ${esc(pz.cognome)} ${esc(pz.nome)}</p>
+    <p><b>Diagnosi:</b> ${esc(i.diagnosi || '')}</p><p><b>Intervento eseguito:</b> ${esc(i.intervento || '')}</p><p><b>Operatori:</b> ${esc(i.operatori || '')}</p>
+    <p class="sp">SI PRESCRIVE:</p>
+    <ul><li>Profilassi antibiotica con ${b(i.antibiotica, '......................................')}</li>
+    <li>Paracetamolo 1000 mg 1 cp in caso di dolore o T&gt;38° C (max ogni 8 ore) salvo ALLERGIA</li>
+    <li>${b(i.prescrizione_extra, '........................................................................')}</li></ul>
+    <p class="sp">RACCOMANDAZIONI:</p>
+    <ul><li>Ghiaccio a cicli (20 - 30 min) per 24 ore</li>
+    <li>Capo sollevato a 45° (2 cuscini) per 7-10 giorni se intervento su testa e collo. Se intervento in altra regione, mantenere elevata la zona come possibile.</li>
+    <li>Mantenere la medicazione asciutta e pulita</li>
+    <li>Rimuovere la medicazione, detergere le ferite con disinfettante (NEOMEDIL/ CITROSIL/ BIALCOL/ LYSOFORM CUTE/ AMUKINE MED 0,05%/ BETADINE) dal giorno ${dt(i.medicazione_dal)} e coprire le ferite con medicazioni in TNT preconfezionata. Medicare quindi ogni ${b(i.medicazione_ogni, '.......')} giorni seguendo queste indicazioni.</li>
+    <li>Doccia con acqua tiepida con posizionamento di cerotti impermeabili (es. AQUABLOC).</li>
+    <li>Doccia con Fisian Detergente</li>
+    <li>La rimozione delle suture cutanee dovrà essere eseguita NON PRIMA di ${b(i.suture_giorni, '..........')} giorni dall'intervento eccetto in caso di infezioni o deiscenza della ferita.</li></ul>
+    <p>Astenersi dal fumare, da sforzi, carichi ed attività sportiva per 2 settimane.<br>Evitare traumi locali<br>In caso di sanguinamenti eccessivi, dolore e gonfiore ingravescenti, temperatura corporea costantemente &gt; 38 °C contattarci al nostro numero 090-2982102 (telefono o Whatsapp)<br>
+    A guarigione avvenuta applicazione di crema ${b(i.crema, '____________________________')}<br>Evitare esposizione solare e applicare crema solare 50+ ${b(i.crema_solare, '____________________')} per 8-12 mesi.</p>
+    <p class="sp">ESAME ISTOLOGICO</p><p>alla ricezione dell'esame istologico si prega di comunicare tempestivamente il referto alla nostra segreteria, via email all'indirizzo: segreteria@proaesthetics.it<br>o su whatsapp al numero 0902982102</p>
+    <p class="sp">CONTROLLI AMBULATORIALI:</p><p>Prima visita di controllo programmata in data ${dt(i.controllo_data)} alle ore ${b(i.controllo_ora, '.........:.........')}</p>
+    <div class="fir2"><div>Messina, ${esc(fData(i.data))}</div><div class="sg"><div class="im">${i.firma ? `<img src="${esc(i.firma)}" alt="">` : ''}</div><div class="s">Per presa visione</div></div></div></div>`;
+}
+VISTE.istr = async (id, pazId) => {
+  const nuovo = id === 'new', mod = can('clinica', true);
+  let i = nuovo ? null : (await q(sb.from('istruzioni_postop').select('*').eq('id', id)))[0];
+  if (!nuovo && !i) return schermo({ titolo: 'Istruzioni', back: true, body: '<p>Documento non trovato</p>' });
+  const pid = nuovo ? pazId : i.paziente_id, pz = S.pazienti.find(x => x.id === pid);
+  if (!pz) return schermo({ titolo: 'Istruzioni', back: true, body: '<p>Paziente non trovato</p>' });
+  if (nuovo) {
+    const an = (await q(sb.from('anamnesi').select('diagnosi,tipo_intervento').eq('paziente_id', pid)))[0] || {};
+    i = { data: oggiISO(), luogo: 'Messina', diagnosi: an.diagnosi || '', intervento: an.tipo_intervento || '', operatori: pz.medici || '', antibiotica: '', prescrizione_extra: '', medicazione_dal: null, medicazione_ogni: null, suture_giorni: null, crema: '', crema_solare: '', controllo_data: null, controllo_ora: '', firma: '' };
+  }
+  let firma = i.firma || '';
+  schermo({
+    titolo: nuovo ? 'Nuove istruzioni' : 'Istruzioni post-operatorie', back: true,
+    body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b></p>
+    <form id="f"><fieldset style="border:0;padding:0;margin:0" ${mod ? '' : 'disabled'}>
+      ${campo('Data', 'data', i.data, 'date', 'required')}
+      ${area('Diagnosi', 'diagnosi', i.diagnosi)}${campo('Intervento eseguito', 'intervento', i.intervento)}${campo('Operatori', 'operatori', i.operatori)}
+      <h3>Si prescrive</h3>${campo('Profilassi antibiotica con', 'antibiotica', i.antibiotica)}${campo('Ulteriore prescrizione', 'prescrizione_extra', i.prescrizione_extra)}
+      <p class="m">Paracetamolo 1000 mg è già riportato nel documento.</p>
+      <h3>Medicazioni e suture</h3>${campo('Medicare dal giorno', 'medicazione_dal', i.medicazione_dal || '', 'date')}
+      <div class="grid2">${campo('Medicare ogni (giorni)', 'medicazione_ogni', i.medicazione_ogni ?? '', 'number', 'min="1" inputmode="numeric"')}${campo('Suture: non prima di (giorni)', 'suture_giorni', i.suture_giorni ?? '', 'number', 'min="1" inputmode="numeric"')}</div>
+      ${campo('Crema a guarigione avvenuta', 'crema', i.crema)}${campo('Crema solare 50+', 'crema_solare', i.crema_solare)}
+      <h3>Primo controllo</h3><div class="grid2">${campo('Data', 'controllo_data', i.controllo_data || '', 'date')}${campo('Ora', 'controllo_ora', i.controllo_ora || '', 'time')}</div>
+      <h3>Per presa visione (facoltativa)</h3>
+      <div class="sigimg" id="sfs" ${firma ? '' : 'hidden'}><img src="${esc(firma)}" alt="Firma"><button type="button" class="t d" id="sfr">Rimuovi firma salvata</button></div>
+      ${sigHtml('sg', ' (paziente)')}</fieldset>
+      <div class="row">${mod ? '<button class="b">Salva</button>' : ''}<button type="button" class="b o" id="pdfi">PDF / Stampa</button>
+      ${!nuovo && can('eliminazione', true) ? '<button type="button" class="b d" id="del">Elimina</button>' : ''}</div></form>`
+  });
+  micro($('#f'));
+  const pad = padFirma($('#sg')); $('#sgc').onclick = () => pad.pulisci();
+  $('#sfr').onclick = () => { firma = ''; $('#sfs').hidden = true; };
+  const intN = v => { const n = parseInt(v, 10); return isNaN(n) ? null : n; };
+  const leggi = () => {
+    const d = fobj($('#f')), t = k => (d[k] || '').trim();
+    return { data: d.data, luogo: i.luogo || 'Messina', diagnosi: t('diagnosi'), intervento: t('intervento'), operatori: t('operatori'), antibiotica: t('antibiotica'), prescrizione_extra: t('prescrizione_extra'),
+      medicazione_dal: d.medicazione_dal || null, medicazione_ogni: intN(d.medicazione_ogni), suture_giorni: intN(d.suture_giorni), crema: t('crema'), crema_solare: t('crema_solare'),
+      controllo_data: d.controllo_data || null, controllo_ora: t('controllo_ora'), firma: pad.ha() ? pad.dati() : firma };
+  };
+  $('#pdfi').onclick = () => stampaDoc(istrHtml(pz, leggi()), `Istruzioni post-operatorie ${pz.cognome} ${pz.nome}`);
+  $('#f').onsubmit = e => {
+    e.preventDefault();
+    ok(async () => {
+      const rec = leggi();
+      if (nuovo) await q(sb.from('istruzioni_postop').insert({ ...rec, paziente_id: pid, autore_nome: me.nome || me.username }));
+      else await q(sb.from('istruzioni_postop').update(rec).eq('id', id));
+      log(nuovo ? 'nuove_istruzioni' : 'modifica_istruzioni', pid); indietro();
+    });
+  };
+  const del = $('#del');
+  if (del) del.onclick = () => conferma('Eliminare il documento?', 'L\'operazione non si può annullare.', () => ok(async () => {
+    await q(sb.from('istruzioni_postop').delete().eq('id', id)); log('elimina_istruzioni', pid); indietro();
+  }));
+};
 
 /* ---------- avvio e blocco per inattività ---------- */
 let inattivo;

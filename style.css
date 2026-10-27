@@ -24,7 +24,7 @@ button.b,a.b{display:inline-flex;align-items:center;justify-content:center;font:
 button.b:disabled{background:#d8d3c6;color:#7b8089;box-shadow:none}
 button.b.o,a.b.o{background:#fff;color:var(--t);border:1.5px solid var(--p);box-shadow:none}
 button.b.d{background:#fff;color:var(--r);border:1.5px solid var(--r);box-shadow:none}
-button.t{border:0;background:none;color:var(--gi);font:700 14px var(--sans);padding:10px 8px;cursor:pointer;min-height:44px}
+button.t,a.t{text-decoration:none;display:inline-flex;align-items:center;border:0;background:none;color:var(--gi);font:700 14px var(--sans);padding:10px 8px;cursor:pointer;min-height:44px}
 button.t.d{color:var(--r)}
 .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .row.nw{flex-wrap:nowrap}.row>*{flex:0 0 auto}.row>.g{flex:1 1 0;min-width:0}
@@ -170,3 +170,23 @@ nav.bar a b{position:relative}.chbd{position:absolute;top:-5px;left:calc(50% + 6
 .imp .t{position:static;display:block;margin:6px 0 0 auto}
 .tabs{overflow-x:auto}.tabs a{white-space:nowrap}
 .tabs a{padding:14px 12px 12px}
+
+/* ---- documenti (v14) ---- */
+.card.dc{display:flex;justify-content:space-between;align-items:center;gap:10px}.dc .dca{display:flex;gap:4px;flex-shrink:0}
+.okt{color:#2E6B3A;font-weight:700}
+.sn{margin:14px 0;padding-bottom:6px;border-bottom:1px solid var(--f)}.sn .sl,.sl{font-weight:700;font-size:14px;margin-top:12px}
+.chips.seg.sn2{max-width:170px;margin:6px 0 0}
+.sigbox{position:relative;height:190px;border:1.5px dashed #B8892F;border-radius:12px;background:#fff;margin-top:8px;overflow:hidden}
+.sigbox canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.sigh{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:12px;color:#aaa;pointer-events:none}
+.sigimg{background:#fff;border:1px solid var(--f);border-radius:12px;padding:10px;margin-top:10px;text-align:center}.sigimg img{max-width:100%;max-height:150px}.sigimg small{display:block;color:var(--m);margin-top:4px}
+.cprev{background:#FAF7F0;border:1px solid #E6D9B5;border-radius:12px;padding:6px 14px;font:14.5px/1.55 Georgia,serif;margin-top:10px}.cprev p{margin:10px 0}.cprev .dich{font-weight:700}
+#print .rel .hd p.dd{margin-top:3px;letter-spacing:.12em}
+#print .rel table.an{width:100%;border-collapse:collapse;margin-top:6px}#print .rel .an td{border-bottom:1px solid #999;padding:9px 6px;font-size:13px}#print .rel .an td.e{width:34%;font:700 10.5px Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#6B6559}
+#print .rel .tb td.sn{white-space:nowrap;border-bottom:1px solid #D9B866;margin:0;padding:5px}
+#print .rel.cons{font-size:11.6px;line-height:1.45}#print .rel.cons p{margin:0 0 8px}#print .rel.cons h2{margin:14px 0 10px}#print .rel .dich{font:11px Arial,sans-serif;margin-top:10px}
+#print .rel .fir2{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:22px;page-break-inside:avoid}
+#print .rel .sg{width:210px;text-align:center}#print .rel .sg .im{height:68px;display:flex;align-items:flex-end;justify-content:center}#print .rel .sg .im img{max-height:66px;max-width:100%}
+#print .rel .sg .s{border-top:1px solid #111;padding-top:4px;font-size:11.5px}
+#print .rel .aud{font:9px Arial,sans-serif;color:#6B6559;margin-top:14px;border-top:1px solid #D9B866;padding-top:5px;word-break:break-all}
+#print .rel.ist{font:12.2px/1.5 Arial,sans-serif}#print .rel.ist p{margin:6px 0}#print .rel.ist .sp{margin-top:14px;font-weight:700}#print .rel.ist ul{margin:4px 0 4px 6px;padding-left:20px}#print .rel.ist u{text-decoration:underline dotted}
