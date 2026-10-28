@@ -86,7 +86,8 @@ h3{font:700 11px var(--sans);letter-spacing:.18em;text-transform:uppercase;color
 @media print{
   body>*:not(#print){display:none!important}
   #print{display:block!important}
-  @page{size:A4;margin:14mm}
+  @page{size:A4;margin:0}
+  #print{padding:14mm}
 }
 #print{font-size:12px;font-family:var(--sans)}
 #print h1{font:700 22px var(--serif);margin:0}#print h2{font:700 18px var(--serif);margin:2px 0 4px;color:var(--gi)}

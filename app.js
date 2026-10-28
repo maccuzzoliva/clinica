@@ -115,7 +115,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v15</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v16</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -1140,7 +1140,7 @@ const dataOra = iso => iso ? `${fData(iso)} alle ${oraMsg(iso)}` : '';
 async function stampaDoc(html, titolo) {
   const p = $('#print'); p.innerHTML = html;
   await Promise.all([...p.querySelectorAll('img')].map(i => i.complete ? 0 : new Promise(x => { i.onload = i.onerror = x; })));
-  const t = document.title; document.title = titolo; window.print();
+  const t = document.title; document.title = '\u00a0'; window.print();
   setTimeout(() => { document.title = t; p.innerHTML = ''; }, 1500);
 }
 async function sha256(t) {
