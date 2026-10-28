@@ -88,7 +88,10 @@ const inizPaz = p => `${(p.cognome || '')[0] || ''}${(p.nome || '')[0] || ''}`.t
 const medicoBreve = m => (m.includes('Delia') && m.includes('Micieli')) ? 'Entrambi' : m;
 const kv = (e, v) => `<div class="kv"><span>${esc(e)}</span><span>${v}</span></div>`;
 
+const NAV_MAP = { pazienti: 'pazienti', paziente: 'pazienti', pform: 'pazienti', rel: 'pazienti', prev: 'pazienti', impianto: 'pazienti', anam: 'pazienti', cons: 'pazienti', istr: 'pazienti', firma: 'pazienti', app: 'agenda', agenda: 'agenda', chat: 'chat', conv: 'chat', magazzino: 'magazzino', articolo: 'magazzino', listino: 'listino', voce: 'listino', utenti: 'utenti', utente: 'utenti' };
+const navDaRotta = () => NAV_MAP[(location.hash.replace(/^#\//, '') || 'pazienti').split('/')[0]] || 'pazienti';
 function schermo({ titolo, back = false, azioni = '', nav = null, body }) {
+  nav = nav || navDaRotta();
   const navi = nav ? `<nav class="bar"><div>
     <a href="#/pazienti" class="${nav === 'pazienti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.8a3.4 3.4 0 010 6.4M18.5 14.8c1.8.7 2.8 2.3 3 4.7"/></svg></b>Pazienti</a>
     ${can('agenda') ? `<a href="#/agenda" class="${nav === 'agenda' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></b>Agenda</a>` : ''}
@@ -112,7 +115,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v14</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v15</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -330,8 +333,8 @@ VISTE.pform = async id => {
       <datalist id="stciv"><option>Celibe/Nubile</option><option>Coniugato/a</option><option>Convivente</option><option>Separato/a</option><option>Divorziato/a</option><option>Vedovo/a</option></datalist>
       <div class="grid2">${campo('N° registro', 'n_reg', p.n_reg)}${campo('Data e ora ricovero', 'data_ricovero', dtLocal(p.data_ricovero), 'datetime-local')}</div>
       <div class="f" style="margin-top:12px">Medico</div>
-      <label class="chk" style="margin:6px 0"><input type="checkbox" name="m_delia" ${(p.medici || '').includes('Prof. Delia') ? 'checked' : ''}>Prof. Delia</label>
-      <label class="chk" style="margin:6px 0"><input type="checkbox" name="m_micieli" ${(p.medici || '').includes('Dott. Micieli') ? 'checked' : ''}>Dott. Micieli</label>
+      <label class="chk" style="margin:6px 0"><input type="checkbox" name="m_delia" ${haMed(p.medici, 'Delia') ? 'checked' : ''}>Prof. Gabriele Delia</label>
+      <label class="chk" style="margin:6px 0"><input type="checkbox" name="m_micieli" ${haMed(p.medici, 'Micieli') ? 'checked' : ''}>Dott. Pietro Micieli</label>
       <label class="chk"><input type="checkbox" name="consenso_privacy" ${p.consenso_privacy ? 'checked' : ''}>Informativa privacy (GDPR) firmata</label>
       <label class="chk"><input type="checkbox" name="consenso_informato" ${p.consenso_informato ? 'checked' : ''}>Consenso informato firmato</label>
       ${campo('Data del consenso', 'consenso_data', p.consenso_data || '', 'date')}
@@ -343,7 +346,7 @@ VISTE.pform = async id => {
     const rec = {
       nome: d.nome.trim(), cognome: d.cognome.trim(), data_nascita: d.data_nascita || null, sesso: d.sesso || '',
       codice_fiscale: (d.codice_fiscale || '').trim().toUpperCase(), telefono: (d.telefono || '').trim(), email: (d.email || '').trim(),
-      indirizzo: (d.indirizzo || '').trim(), luogo_nascita: (d.luogo_nascita || '').trim(), telefono_fisso: (d.telefono_fisso || '').trim(), stato_civile: (d.stato_civile || '').trim(), professione: (d.professione || '').trim(), n_reg: (d.n_reg || '').trim(), data_ricovero: d.data_ricovero ? new Date(d.data_ricovero).toISOString() : null, medici: [d.m_delia ? 'Prof. Delia' : '', d.m_micieli ? 'Dott. Micieli' : ''].filter(Boolean).join(', '),
+      indirizzo: (d.indirizzo || '').trim(), luogo_nascita: (d.luogo_nascita || '').trim(), telefono_fisso: (d.telefono_fisso || '').trim(), stato_civile: (d.stato_civile || '').trim(), professione: (d.professione || '').trim(), n_reg: (d.n_reg || '').trim(), data_ricovero: d.data_ricovero ? new Date(d.data_ricovero).toISOString() : null, medici: [d.m_delia ? 'Prof. Gabriele Delia' : '', d.m_micieli ? 'Dott. Pietro Micieli' : ''].filter(Boolean).join(', '),
       consenso_privacy: !!d.consenso_privacy, consenso_informato: !!d.consenso_informato,
       consenso_data: d.consenso_informato ? (d.consenso_data || oggiISO()) : (d.consenso_data || null)
     };
@@ -386,10 +389,19 @@ async function tabStorico(pz) {
   let l = [];
   try { l = await q(sb.from('storico').select('*').eq('paziente_id', pz.id).order('creato_il', { ascending: false }).limit(300)); }
   catch (e) { $('#tc').innerHTML = '<p class="warn">Storico non disponibile: esegui l\'aggiornamento del database. ' + esc(e.message) + '</p>'; return; }
-  $('#tc').innerHTML = `<p class="m" style="font-size:12px">🔒 Visibile solo all'amministratore. Non si può modificare.</p>` + (l.length ? l.map(x => {
+  const adm = me.ruolo === 'admin';
+  $('#tc').innerHTML = `<p class="m" style="font-size:12px">🔒 Visibile e cancellabile solo dall'amministratore.</p>` + (l.length ? l.map(x => {
     const d = new Date(x.creato_il);
-    return `<div class="sto"><div class="sd">${esc(d.toLocaleDateString('it-IT'))}<br>${esc(oraMsg(x.creato_il))}</div><div><b>${esc(x.utente_nome || 'Utente')}</b> ${esc(STO_A[x.azione] || x.azione)} ${esc(STO_T[x.tabella] || x.tabella)}${x.dettaglio ? `<small>${esc(x.dettaglio.replace(/_/g, ' '))}</small>` : ''}</div></div>`;
-  }).join('') : '<p class="m">Nessuna modifica registrata.</p>');
+    return `<div class="sto"><div class="sd">${esc(d.toLocaleDateString('it-IT'))}<br>${esc(oraMsg(x.creato_il))}</div><div style="flex:1"><b>${esc(x.utente_nome || 'Utente')}</b> ${esc(STO_A[x.azione] || x.azione)} ${esc(STO_T[x.tabella] || x.tabella)}${x.dettaglio ? `<small>${esc(x.dettaglio.replace(/_/g, ' '))}</small>` : ''}</div>${adm ? `<button class="t d" data-sd="${x.id}" aria-label="Elimina">✕</button>` : ''}</div>`;
+  }).join('') + (adm ? '<div class="row"><button class="b d" id="sdall">Cancella tutto lo storico</button></div>' : '') : '<p class="m">Nessuna modifica registrata.</p>');
+  if (!adm) return;
+  document.querySelectorAll('[data-sd]').forEach(b => b.onclick = () => conferma('Eliminare la voce?', 'La voce dello storico verrà cancellata definitivamente.', () => ok(async () => {
+    await q(sb.from('storico').delete().eq('id', b.dataset.sd)); await tabStorico(pz);
+  })));
+  const all = $('#sdall');
+  if (all) all.onclick = () => conferma('Cancellare tutto lo storico?', 'Verranno cancellate tutte le voci di questo paziente. Non si può annullare.', () => ok(async () => {
+    await q(sb.from('storico').delete().eq('paziente_id', pz.id)); await tabStorico(pz);
+  }));
 }
 
 function tabScheda(pz) {
@@ -467,7 +479,8 @@ async function tabClinica(pz) {
 
 /* ---------- RELAZIONI CLINICHE ---------- */
 const REL_TIPI = ['Pre-operatoria', 'Post-operatoria', 'Di controllo', 'Altro'];
-const REL_MEDICI = ['Prof. Delia', 'Dott. Micieli'];
+const REL_MEDICI = ['Prof. Gabriele Delia', 'Dott. Pietro Micieli'];
+const haMed = (txt, m) => String(txt || '').includes(m.split(' ').pop());
 function relHtml(pz, r) {
   const tt = { 'Pre-operatoria': ' PRE-OPERATORIA', 'Post-operatoria': ' POST-OPERATORIA', 'Di controllo': ' DI CONTROLLO' }[r.tipo] || '';
   const sez = (t, v) => v && String(v).trim() ? `<h3>${t}</h3><p>${esc(v).replace(/\n/g, '<br>')}</p>` : '';
@@ -495,7 +508,7 @@ VISTE.rel = async (id, pazId) => {
   if (!pz) return schermo({ titolo: 'Relazione', back: true, body: '<p>Paziente non trovato</p>' });
   if (nuovo) {
     const an = (await q(sb.from('anamnesi').select('*').eq('paziente_id', pid)))[0] || {};
-    r = { data_relazione: oggiISO(), tipo: 'Pre-operatoria', medico: REL_MEDICI.find(m => (pz.medici || '').includes(m)) || '', motivo: '', esame: '', diagnosi: an.diagnosi || '', intervento: an.tipo_intervento || '', conclusioni: '' };
+    r = { data_relazione: oggiISO(), tipo: 'Pre-operatoria', medico: REL_MEDICI.find(m => haMed(pz.medici, m)) || '', motivo: '', esame: '', diagnosi: an.diagnosi || '', intervento: an.tipo_intervento || '', conclusioni: '' };
   }
   schermo({
     titolo: nuovo ? 'Nuova relazione' : 'Relazione', back: true,
@@ -953,7 +966,7 @@ VISTE.impianto = async pazId => {
       <label class="f">Lotto<select name="lot" required><option value="">Scegli prima l'articolo</option></select></label>
       <label class="f">Lato${scelta('lato', ['Destro', 'Sinistro', 'Non applicabile'], 'Destro')}</label>
       ${campo('Numero di serie', 'seriale', '')}
-      <div class="grid2">${campo('Data impianto', 'data_impianto', oggiISO(), 'date', 'required')}<label class="f">Medico<select name="medico"><option value="">—</option>${REL_MEDICI.map(m => `<option ${(pz.medici || '').includes(m) ? 'selected' : ''}>${m}</option>`).join('')}</select></label></div>
+      <div class="grid2">${campo('Data impianto', 'data_impianto', oggiISO(), 'date', 'required')}<label class="f">Medico<select name="medico"><option value="">—</option>${REL_MEDICI.map(m => `<option ${haMed(pz.medici, m) ? 'selected' : ''}>${m}</option>`).join('')}</select></label></div>
       <div class="okb" id="info" hidden></div><div class="row"><button class="b">Salva impianto</button></div></form>` : '<p class="m">Nessun articolo disponibile nel magazzino. Registra prima un carico.</p>'}`
   });
   if (!disp.length) return;
@@ -1152,10 +1165,57 @@ function padFirma(cv) {
 }
 const sigHtml = (id, nota = '') => `<div class="sigbox"><canvas id="${id}"></canvas><span class="sigh">Firma qui con il dito${nota}</span></div><div class="row" style="margin-top:6px"><button type="button" class="t" id="${id}c">Cancella firma</button></div>`;
 
+
+/* ---------- firme digitali sui documenti ---------- */
+async function firmeCarica(pid) {
+  try { return Object.fromEntries((await q(sb.from('firme_doc').select('*').eq('paziente_id', pid))).map(r => [r.tipo, r])); } catch (e) { return {}; }
+}
+const firmaAud = r => r ? `Firmata il ${dataOra(r.firmato_il)}${r.firmato_da_nome ? ' · ' + r.firmato_da_nome : ''}` : '';
+function firmeUI(slots, ex) {
+  return slots.map(([t, l]) => `<h3>${esc(l)}</h3>
+    <div class="sigimg" ${ex[t] ? '' : 'hidden'}><img src="${esc((ex[t] || {}).firma || '')}" alt=""><small>${esc(firmaAud(ex[t]))}</small></div>
+    ${sigHtml('sg_' + t, ex[t] ? ' (per sostituire la firma salvata)' : '')}`).join('');
+}
+function firmeInit(slots, alCambio = () => {}) {
+  const pads = {};
+  slots.forEach(([t]) => { pads[t] = padFirma($('#sg_' + t)); pads[t].su(alCambio); $('#sg_' + t + 'c').onclick = () => pads[t].pulisci(); });
+  return pads;
+}
+async function firmeSalva(pid, pads) {
+  for (const [t, pad] of Object.entries(pads)) {
+    if (!pad.ha()) continue;
+    const firma = pad.dati();
+    await q(sb.from('firme_doc').upsert({ paziente_id: pid, tipo: t, firma, impronta: await sha256(`${t}|${firma}|${pid}`), firmato_il: new Date().toISOString(), firmato_da_nome: me.nome || me.username }, { onConflict: 'paziente_id,tipo' }));
+  }
+}
+const firmeEffettive = (ex, pads) => { const f = { ...ex }; Object.entries(pads).forEach(([t, p]) => { if (p.ha()) f[t] = { tipo: t, firma: p.dati(), firmato_il: new Date().toISOString(), firmato_da_nome: me.nome || me.username }; }); return f; };
+const sigBlocco = (r, et) => `<div class="sg"><div class="im">${r ? `<img src="${esc(r.firma)}" alt="">` : ''}</div><div class="s">${et}</div></div>`;
+const audFirme = rs => { const l = rs.filter(Boolean).map(r => `${r.tipo === 'anam_med' ? 'Medico' : 'Paziente'}: firma elettronica apposta il ${dataOra(r.firmato_il)} · registrata da ${r.firmato_da_nome || '—'}`); return l.length ? `<div class="aud">${esc(l.join('  |  '))}</div>` : ''; };
+
+VISTE.firma = async pazId => {
+  const pz = S.pazienti.find(x => x.id === pazId);
+  if (!pz || !can('clinica')) return go('#/pazienti');
+  const mod = can('clinica', true), slots = [['ricovero', 'Firma del paziente']];
+  const ex = await firmeCarica(pazId);
+  schermo({
+    titolo: 'Firma digitale', back: true,
+    body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b> · Scheda anagrafica / ricovero</p>
+      ${mod ? firmeUI(slots, ex) : (ex.ricovero ? firmeUI(slots, ex).replace(/<div class="sigbox">.*$/s, '') : '<p class="m">Nessuna firma</p>')}
+      <div class="row">${mod ? '<button class="b" id="fs" disabled>Salva firma</button>' : ''}<button class="b o" id="fp">PDF / Stampa</button></div>`
+  });
+  const stampaAnag = async f => { const a = (await q(sb.from('anamnesi').select('*').eq('paziente_id', pazId)))[0] || {}; await stampaDoc(anagHtml(pz, a, f), `Scheda anagrafica ${pz.cognome} ${pz.nome}`); };
+  let pads = {};
+  if (mod) {
+    pads = firmeInit(slots, () => { $('#fs').disabled = !pads.ricovero.ha(); });
+    $('#fs').onclick = () => ok(async () => { await firmeSalva(pazId, pads); log('firma_ricovero', pazId); await render(); });
+  }
+  $('#fp').onclick = () => ok(() => stampaAnag(firmeEffettive(ex, pads)));
+};
+
 /* ---------- TAB DOCUMENTI ---------- */
 async function tabDocumenti(pz) {
   const id = pz.id, mod = can('clinica', true);
-  let cons = [], ist = [], an = [];
+  let cons = [], ist = [], an = [], fr = {};
   try {
     [cons, ist, an] = await Promise.all([
       q(sb.from('consensi').select('id,intervento,medico,data,firmato_il,firmato_da_nome').eq('paziente_id', id).order('firmato_il', { ascending: false })),
@@ -1163,12 +1223,14 @@ async function tabDocumenti(pz) {
       q(sb.from('anamnesi').select('scheda').eq('paziente_id', id))
     ]);
   } catch (e) { $('#tc').innerHTML = '<p class="warn">Documenti non disponibili: esegui l\'aggiornamento del database. ' + esc(e.message) + '</p>'; return; }
+  fr = await firmeCarica(id);
   const sc = (an[0] || {}).scheda || {};
   $('#tc').innerHTML = `<h3 style="margin-top:0">Scheda anagrafica / ricovero</h3>
     <div class="card dc"><div><b>Dati anagrafici e di ricovero</b><div class="m">${pz.n_reg ? 'N° registro ' + esc(pz.n_reg) + ' · ' : ''}${pz.data_ricovero ? 'Ricovero ' + esc(dataOra(pz.data_ricovero)) : 'Ricovero non indicato'}</div></div>
-      <div class="dca">${can('pazienti', true) ? `<a class="t" href="#/pform/${id}">Modifica</a>` : ''}<button class="t" id="dpa">PDF</button></div></div>
+      ${fr.ricovero ? '<div class="m"><span class="okt">Firmata</span> ' + esc(dataOra(fr.ricovero.firmato_il)) + '</div>' : ''}</div>
+      <div class="dca">${can('pazienti', true) ? `<a class="t" href="#/pform/${id}">Modifica</a>` : ''}<a class="t" href="#/firma/${id}">Firma</a><button class="t" id="dpa">PDF</button></div></div>
     <h3>Scheda anamnestica</h3>
-    <a class="card rl" href="#/anam/${id}"><b>Scheda anamnestica</b><div class="m">${sc.agg ? 'Compilata il ' + esc(fData(sc.agg)) : 'Da compilare'}</div></a>
+    <a class="card rl" href="#/anam/${id}"><b>Scheda anamnestica</b><div class="m">${sc.agg ? 'Compilata il ' + esc(fData(sc.agg)) : 'Da compilare'}${fr.anam_paz ? ' · <span class="okt">firma paziente</span>' : ''}${fr.anam_med ? ' · <span class="okt">firma medico</span>' : ''}</div></a>
     <h3>Consenso informato</h3>
     ${cons.length ? cons.map(c => `<a class="card rl" href="#/cons/${c.id}"><b>${esc(c.intervento || 'Consenso informato')}</b><div class="m"><span class="okt">Firmato</span> ${esc(dataOra(c.firmato_il))}${c.firmato_da_nome ? ' · ' + esc(c.firmato_da_nome) : ''}</div></a>`).join('') : '<p class="m">Nessun consenso firmato</p>'}
     ${mod ? `<div class="row"><a class="b" href="#/cons/new/${id}">+ Nuovo consenso</a></div>` : ''}
@@ -1177,12 +1239,12 @@ async function tabDocumenti(pz) {
     ${mod ? `<div class="row"><a class="b" href="#/istr/new/${id}">+ Nuove istruzioni</a></div>` : ''}`;
   $('#dpa').onclick = () => ok(async () => {
     const a = (await q(sb.from('anamnesi').select('*').eq('paziente_id', id)))[0] || {};
-    await stampaDoc(anagHtml(pz, a), `Scheda anagrafica ${pz.cognome} ${pz.nome}`);
+    await stampaDoc(anagHtml(pz, a, fr), `Scheda anagrafica ${pz.cognome} ${pz.nome}`);
   });
 }
 
 /* ---------- SCHEDA ANAGRAFICA / RICOVERO ---------- */
-function anagHtml(pz, a) {
+function anagHtml(pz, a, f = {}) {
   const r = (e, v) => `<tr><td class="e">${e}</td><td class="v">${v ? esc(v) : '&nbsp;'}</td></tr>`;
   return `<div class="rel">${docHd()}<h2>SCHEDA ANAGRAFICA / RICOVERO</h2>
     <table class="an">${r('N° Reg.', pz.n_reg)}${r('Cognome e nome', `${pz.cognome} ${pz.nome}`)}${r('Sesso', pz.sesso)}
@@ -1190,14 +1252,14 @@ function anagHtml(pz, a) {
     ${r('Telefono (domicilio)', pz.telefono_fisso)}${r('Cellulare', pz.telefono)}${r('Stato civile', pz.stato_civile)}${r('Professione', pz.professione)}
     ${r('Codice fiscale', pz.codice_fiscale)}${r('Data e ora ricovero', dataOra(pz.data_ricovero))}
     ${r('Patologia', a.diagnosi)}${r('Intervento', a.tipo_intervento)}</table>
-    <div class="fir"><div>Messina, ${esc(fData(oggiISO()))}</div><div class="s">Firma del paziente</div></div>${docFt()}</div>`;
+    <div class="fir2"><div>Messina, ${esc(fData(oggiISO()))}</div>${sigBlocco(f.ricovero, 'Firma del paziente')}</div>${audFirme([f.ricovero])}${docFt()}</div>`;
 }
 
 /* ---------- SCHEDA ANAMNESTICA ---------- */
 const AN_FAM = ['Cardiovascolari', 'Diabete', 'Tumori', 'Psichiatriche', 'Altre patologie rilevanti'];
 const AN_REM = ['Cardiopatie / Ipertensione', 'Diabete / Dislipidemie', 'Patologie respiratorie (asma, BPCO, apnea notturna)', 'Patologie epatiche (epatiti, cirrosi, enzimi elevati)', 'Malattie infettive (HIV, HBV, HCV, TBC, altre)', 'Patologie renali / urinarie', 'Patologie gastrointestinali (ulcera, reflusso, colon irritabile)', 'Patologie endocrine (tiroide, surreni, ovariche/testicolari)', 'Malattie autoimmuni / reumatologiche', 'Patologie neurologiche / psichiatriche', 'Neoplasie pregresse', 'Altre patologie rilevanti'];
 const AN_GRAV = ['Non applicabile', 'Gravidanza in corso', 'Allattamento'];
-function anamHtml(pz, s) {
+function anamHtml(pz, s, fr = {}) {
   const f = s.fam || [], r = s.rem || [], al = s.all || {};
   const rig = (l, o) => `<tr><td>${esc(l)}</td><td class="sn">${marca((o || {}).v)}</td><td>${esc((o || {}).n || '')}</td></tr>`;
   const bx = v => v && String(v).trim() ? esc(v).replace(/\n/g, '<br>') : '&nbsp;';
@@ -1211,12 +1273,13 @@ function anamHtml(pz, s) {
     <h3>Assunzione di farmaci o altre sostanze</h3><p>${marca((s.farm || {}).v)}${(s.farm || {}).n ? ' → ' + esc(s.farm.n).replace(/\n/g, '<br>') : ''}</p>
     <h3>Fumo e alcool</h3><p>Fumo: ${marca((s.fumo || {}).v)}${(s.fumo || {}).v === 'Sì' && (s.fumo || {}).n ? ' → ' + esc(s.fumo.n) + ' sig/die' : ''}<br>Alcool: ${marca((s.alcool || {}).v)}${(s.alcool || {}).v === 'Sì' && (s.alcool || {}).n ? ' → ' + esc(s.alcool.n) + ' unità/sett' : ''}</p>
     <h3>Osservazioni cliniche</h3><p>${bx(s.oss)}</p><h3>Note cliniche aggiuntive</h3><p>${bx(s.note)}</p>
-    <div class="fir"><div>Messina, ${esc(fData(s.agg || oggiISO()))}</div><div class="s">Firma del medico</div></div>${docFt()}</div>`;
+    <div class="fir2"><div>Messina, ${esc(fData(s.agg || oggiISO()))}</div>${sigBlocco(fr.anam_paz, 'Firma del paziente')}${sigBlocco(fr.anam_med, 'Firma del medico')}</div>${audFirme([fr.anam_paz, fr.anam_med])}${docFt()}</div>`;
 }
 VISTE.anam = async pazId => {
   const pz = S.pazienti.find(x => x.id === pazId), mod = can('clinica', true);
   if (!pz || !can('clinica')) return go('#/pazienti');
   const a = (await q(sb.from('anamnesi').select('*').eq('paziente_id', pazId)))[0] || {};
+  const exF = await firmeCarica(pazId), slotF = [['anam_paz', 'Firma del paziente'], ['anam_med', 'Firma del medico']];
   const s = a.scheda || {}, f = s.fam || [], r = s.rem || [], al = s.all || {};
   const blocco = (pre, i, l, o) => `<div class="sn"><div class="sl">${esc(l)}</div>${sino(`${pre}${i}_v`, (o || {}).v)}${campo('Chi / note', `${pre}${i}_n`, (o || {}).n || '')}</div>`;
   schermo({
@@ -1234,10 +1297,12 @@ VISTE.anam = async pazId => {
     <h3>Fumo e alcool</h3><div class="sl">Fumo</div>${sino('fumo_v', (s.fumo || {}).v)}${campo('Sigarette al giorno', 'fumo_n', (s.fumo || {}).n || '', 'text', 'inputmode="numeric"')}
     <div class="sl">Alcool</div>${sino('alc_v', (s.alcool || {}).v)}${campo('Unità a settimana', 'alc_n', (s.alcool || {}).n || '', 'text', 'inputmode="numeric"')}
     <h3>Osservazioni cliniche</h3>${area('', 'oss', s.oss)}<h3>Note cliniche aggiuntive</h3>${area('', 'note', s.note)}</fieldset>
+    ${mod ? firmeUI(slotF, exF) : ''}
     <div class="row">${mod ? '<button class="b">Salva scheda</button>' : ''}<button type="button" class="b o" id="pdfa">PDF / Stampa</button></div></form>`
   });
   document.querySelectorAll('#f textarea').forEach(t => { t.style.minHeight = '90px'; });
   micro($('#f'));
+  const padF = mod ? firmeInit(slotF) : {};
   const leggi = () => {
     const d = fobj($('#f')), t = k => (d[k] || '').trim();
     const gr = (pre, n) => Array.from({ length: n }, (_, i) => ({ v: d[`${pre}${i}_v`] || '', n: t(`${pre}${i}_n`) }));
@@ -1248,14 +1313,14 @@ VISTE.anam = async pazId => {
       oss: t('oss'), note: t('note'), agg: oggiISO()
     };
   };
-  $('#pdfa').onclick = () => stampaDoc(anamHtml(pz, leggi()), `Scheda anamnestica ${pz.cognome} ${pz.nome}`);
+  $('#pdfa').onclick = () => stampaDoc(anamHtml(pz, leggi(), firmeEffettive(exF, padF)), `Scheda anamnestica ${pz.cognome} ${pz.nome}`);
   $('#f').onsubmit = e => {
     e.preventDefault(); const sc = leggi();
     const alle = [sc.all.farmaci && 'Farmaci: ' + sc.all.farmaci, sc.all.alimenti && 'Alimenti: ' + sc.all.alimenti, sc.all.altro && 'Altro: ' + sc.all.altro].filter(Boolean);
     const pat = sc.rem.map((o, i) => o.v === 'Sì' ? AN_REM[i] + (o.n ? ' (' + o.n + ')' : '') : '').filter(Boolean);
     const rec = { paziente_id: pazId, scheda: sc, allergie: alle.length ? alle.join('; ') : (sc.all.nessuna ? 'Nessuna' : (a.allergie || '')), patologie: pat.length ? pat.join('; ') : (a.patologie || ''),
       farmaci: sc.farm.v === 'Sì' ? (sc.farm.n || 'Sì') : (sc.farm.v === 'No' ? '' : (a.farmaci || '')), fumatore: sc.fumo.v === 'Sì' ? 'Sì' : (sc.fumo.v === 'No' ? 'No' : (a.fumatore || '')) };
-    ok(async () => { await q(sb.from('anamnesi').upsert(rec, { onConflict: 'paziente_id' })); log('modifica_anamnesi', pazId); indietro(); });
+    ok(async () => { await q(sb.from('anamnesi').upsert(rec, { onConflict: 'paziente_id' })); await firmeSalva(pazId, padF); log('modifica_anamnesi', pazId); indietro(); });
   };
 };
 
@@ -1328,7 +1393,7 @@ async function consNuovo(pazId) {
     body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b>${pz.data_nascita ? ' · nato/a il ' + esc(fData(pz.data_nascita)) : ''}</p>
     <form id="f"><label class="f">Modello${scelta('mod', Object.keys(CONS_MOD), 'Generico')}</label>
       <div class="grid2">${campo('Data', 'data', oggiISO(), 'date', 'required')}${campo('Luogo', 'luogo', 'Messina')}</div>
-      <label class="f">Medico<select name="medico"><option value="">—</option>${REL_MEDICI.map(m => `<option ${(pz.medici || '').includes(m) && !(pz.medici || '').includes(',') ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label class="f">Medico<select name="medico"><option value="">—</option>${REL_MEDICI.map(m => `<option ${haMed(pz.medici, m) && !(pz.medici || '').includes(',') ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
       ${campo('Intervento', 'intervento', an.tipo_intervento || '', 'text', 'required')}
       <label class="f">Anestesia${scelta('anestesia', CONS_ANEST, 'Locale')}</label>
       ${area('Rischi specifici dell\'intervento', 'rischi', '')}

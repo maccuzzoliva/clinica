@@ -137,14 +137,14 @@ nav.bar a b{position:relative}.chbd{position:absolute;top:-5px;left:calc(50% + 6
 .crow .av.k{background:#111;color:var(--gl);border-color:#111}
 .crow .g{flex:1;min-width:0}.crow .g b{display:block;font-size:16px}.crow .g small{display:block;color:var(--m);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crow .ct{font-size:11px;color:var(--m);text-align:right}.crow .n{display:inline-block;background:var(--g);color:#fff;font-weight:700;border-radius:10px;padding:2px 7px;margin-top:4px}
-.chatl{display:flex;flex-direction:column;gap:8px;padding-bottom:78px}
+.chatl{display:flex;flex-direction:column;gap:8px;padding-bottom:150px}
 .chatl .day{align-self:center;font-size:11px;color:var(--m);background:#F2EDE0;border-radius:10px;padding:3px 10px;margin:6px 0}
 .msg{max-width:80%;padding:9px 12px;border-radius:14px;font-size:15px;line-height:1.4;word-wrap:break-word}
 .msg small{display:block;font-size:11px;color:var(--gi);font-weight:700;margin-bottom:2px}
 .msg.in{background:#fff;border:1px solid var(--f);border-bottom-left-radius:4px;align-self:flex-start}
 .msg.out{background:#111;color:#fff;border-bottom-right-radius:4px;align-self:flex-end}
 .msg .o{display:block;font-size:10px;text-align:right;margin-top:3px;opacity:.7}
-.cbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--l);display:flex;gap:8px;align-items:flex-end;padding:10px 12px calc(10px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
+.cbar{position:fixed;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--l);display:flex;gap:8px;align-items:flex-end;padding:10px 12px;max-width:760px;margin:0 auto}
 .cbar .cin{flex:1;position:relative;display:block;margin:0}.cbar textarea{margin:0;min-height:44px;max-height:120px;border-radius:22px;padding:11px 56px 11px 16px;resize:none}
 .cbar .mic{right:6px;bottom:2px;width:36px;height:36px}
 .cbar .snd{width:44px;height:44px;border-radius:50%;border:0;background:#111;color:var(--gl);font-size:18px;box-shadow:inset 0 0 0 1.5px var(--gl);cursor:pointer;flex:none}
@@ -190,3 +190,4 @@ nav.bar a b{position:relative}.chbd{position:absolute;top:-5px;left:calc(50% + 6
 #print .rel .sg .s{border-top:1px solid #111;padding-top:4px;font-size:11.5px}
 #print .rel .aud{font:9px Arial,sans-serif;color:#6B6559;margin-top:14px;border-top:1px solid #D9B866;padding-top:5px;word-break:break-all}
 #print .rel.ist{font:12.2px/1.5 Arial,sans-serif}#print .rel.ist p{margin:6px 0}#print .rel.ist .sp{margin-top:14px;font-weight:700}#print .rel.ist ul{margin:4px 0 4px 6px;padding-left:20px}#print .rel.ist u{text-decoration:underline dotted}
+.grid2 select{font-size:14px;padding-left:10px;padding-right:6px}
