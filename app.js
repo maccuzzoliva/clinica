@@ -88,7 +88,8 @@ const inizPaz = p => `${(p.cognome || '')[0] || ''}${(p.nome || '')[0] || ''}`.t
 const medicoBreve = m => (m.includes('Delia') && m.includes('Micieli')) ? 'Entrambi' : m;
 const kv = (e, v) => `<div class="kv"><span>${esc(e)}</span><span>${v}</span></div>`;
 
-const NAV_MAP = { pazienti: 'pazienti', paziente: 'pazienti', pform: 'pazienti', rel: 'pazienti', prev: 'pazienti', impianto: 'pazienti', anam: 'pazienti', cons: 'pazienti', istr: 'pazienti', firma: 'pazienti', app: 'agenda', agenda: 'agenda', chat: 'chat', conv: 'chat', magazzino: 'magazzino', articolo: 'magazzino', listino: 'listino', voce: 'listino', utenti: 'utenti', utente: 'utenti' };
+const MFA_ATTIVA = false, BLOCCO_ATTIVO = false;  // 2FA e blocco schermo: da attivare in seguito
+const NAV_MAP = { pazienti: 'pazienti', paziente: 'pazienti', pform: 'pazienti', rel: 'pazienti', prev: 'pazienti', impianto: 'pazienti', anam: 'pazienti', cons: 'pazienti', priv: 'pazienti', istr: 'pazienti', firma: 'pazienti', app: 'agenda', agenda: 'agenda', chat: 'chat', conv: 'chat', magazzino: 'magazzino', articolo: 'magazzino', listino: 'listino', voce: 'listino', utenti: 'utenti', utente: 'utenti' };
 const navDaRotta = () => NAV_MAP[(location.hash.replace(/^#\//, '') || 'pazienti').split('/')[0]] || 'pazienti';
 function schermo({ titolo, back = false, azioni = '', nav = null, body }) {
   nav = nav || navDaRotta();
@@ -115,7 +116,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v16</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v18</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -129,9 +130,46 @@ function vistaLogin(msg = '') {
   };
 }
 
+/* ---------- 2FA (codice dell'app di autenticazione) ---------- */
+async function vistaMfa(giaAttiva) {
+  const testa = `<div class="login"><img src="${LOGO}" alt=""><h1>PROAESTHETICS</h1><div class="gl"></div>`;
+  const pulsanti = `<button type="button" class="t" id="mx" style="margin-top:14px">Esci</button>`;
+  const codice = `<label class="f">Codice a 6 cifre<input name="c" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required style="text-align:center;font-size:22px;letter-spacing:.3em"></label>`;
+  let fid;
+  if (giaAttiva) {
+    const { data } = await sb.auth.mfa.listFactors();
+    fid = data && data.totp && data.totp[0] && data.totp[0].id;
+    $('#app').innerHTML = `${testa}<p class="sub" style="margin-bottom:18px">Verifica in due passaggi</p>
+      <form id="mf">${codice}<div class="err" id="le"></div><button class="b" style="width:100%;margin-top:6px">Verifica</button></form>${pulsanti}</div>`;
+  } else {
+    const { data: tutti } = await sb.auth.mfa.listFactors();
+    for (const f of (tutti && tutti.all) || []) if (f.status === 'unverified') await sb.auth.mfa.unenroll({ factorId: f.id });
+    const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Studio ' + Date.now() });
+    if (error) { await esci(); return vistaLogin('Impossibile attivare la 2FA: ' + error.message); }
+    fid = data.id;
+    $('#app').innerHTML = `${testa}<p class="sub" style="margin-bottom:14px">Attiva la verifica in due passaggi</p>
+      <p class="m" style="text-align:left">1. Installa <b>Google Authenticator</b> (o Microsoft Authenticator) sul telefono.<br>2. Inquadra questo codice, oppure inserisci la chiave a mano.<br>3. Scrivi qui il codice a 6 cifre che compare.</p>
+      <img src="${data.totp.qr_code}" alt="QR" style="width:200px;height:200px;background:#fff;padding:6px;border-radius:8px;margin:10px auto;display:block">
+      <p class="m"><small>Chiave:</small><br><b style="word-break:break-all;user-select:all">${esc(data.totp.secret)}</b></p>
+      <form id="mf">${codice}<div class="err" id="le"></div><button class="b" style="width:100%;margin-top:6px">Attiva e accedi</button></form>${pulsanti}</div>`;
+  }
+  $('#mx').onclick = () => esci();
+  $('#mf').onsubmit = async e => {
+    e.preventDefault(); busy(true);
+    try {
+      const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: fid, code: fobj(e.target).c.trim() });
+      if (error) throw new Error(/invalid/i.test(error.message) ? 'Codice errato o scaduto.' : error.message);
+      await entra();
+    } catch (err) { $('#le').textContent = err.message; }
+    finally { busy(false); }
+  };
+}
+
 async function entra() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return vistaLogin();
+  const { data: aal } = MFA_ATTIVA ? await sb.auth.mfa.getAuthenticatorAssuranceLevel() : { data: null };
+  if (MFA_ATTIVA && aal && aal.currentLevel !== 'aal2') return vistaMfa(aal.nextLevel === 'aal2');
   const p = await q(sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle());
   if (!p) { await esci(); return vistaLogin('Profilo non trovato: contatta l\'amministratore.'); }
   if (!p.attivo) { await esci(); return vistaLogin('Utenza disattivata. Contatta l\'amministratore.'); }
@@ -382,7 +420,7 @@ VISTE.paziente = async (id, tab = 'scheda') => {
   await ({ scheda: tabScheda, clinica: tabClinica, documenti: tabDocumenti, foto: tabFoto, conti: tabConti, impianti: tabImpianti, storico: tabStorico }[tab])(pz);
 };
 
-const STO_T = { pazienti: 'anagrafica', anamnesi: 'anamnesi', note_cliniche: 'nota clinica', foto: 'foto', appuntamenti: 'appuntamento', preventivi: 'preventivo', pagamenti: 'pagamento', relazioni: 'relazione', consensi: 'consenso informato', istruzioni_postop: 'istruzioni post-operatorie', mag_articoli: 'articolo', impianti: 'impianto' };
+const STO_T = { pazienti: 'anagrafica', anamnesi: 'anamnesi', note_cliniche: 'nota clinica', foto: 'foto', appuntamenti: 'appuntamento', preventivi: 'preventivo', pagamenti: 'pagamento', relazioni: 'relazione', consensi: 'consenso informato', consensi_privacy: 'informativa privacy', istruzioni_postop: 'istruzioni post-operatorie', mag_articoli: 'articolo', impianti: 'impianto' };
 const STO_A = { insert: 'ha creato', update: 'ha modificato', delete: 'ha eliminato' };
 async function tabStorico(pz) {
   $('#tc').innerHTML = '<p class="m">Caricamento…</p>';
@@ -1058,8 +1096,13 @@ VISTE.utente = async id => {
         ? scelta('p_' + k, ['No', 'Sì'], livello(k) === 'edit' ? 'Sì' : 'No')
         : scelta('p_' + k, ['Nessuno', 'Lettura', 'Modifica'], { none: 'Nessuno', view: 'Lettura', edit: 'Modifica' }[livello(k)])}</label>`).join('')}</div>
       <div class="row"><button class="b">Salva</button>${!nuovo && !io ? '<button type="button" class="b d" id="del">Elimina utente</button>' : ''}</div>
+      ${!nuovo && MFA_ATTIVA ? '<button type="button" class="b o" id="r2fa" style="width:100%;margin-top:10px">Reimposta 2FA (telefono perso o cambiato)</button>' : ''}
       <p class="m">Le modifiche ai permessi valgono dal prossimo accesso o aggiornamento dell'altro utente.</p></form>`
   });
+  const r2 = $('#r2fa');
+  if (r2) r2.onclick = () => conferma('Reimpostare la 2FA?', `@${u.username} dovrà registrare di nuovo l'app di autenticazione al prossimo accesso.`, () => ok(async () => {
+    await gestioneUtenti({ azione: 'reset2fa', id }); avviso('Fatto', 'Al prossimo accesso verrà chiesto di attivare di nuovo la 2FA.');
+  }));
   const mostra = () => { $('#perm').hidden = $('#f [name=admin]').checked; };
   $('#f [name=admin]').onchange = mostra; mostra();
   $('#f').onsubmit = e => {
@@ -1215,7 +1258,7 @@ VISTE.firma = async pazId => {
 /* ---------- TAB DOCUMENTI ---------- */
 async function tabDocumenti(pz) {
   const id = pz.id, mod = can('clinica', true);
-  let cons = [], ist = [], an = [], fr = {};
+  let cons = [], ist = [], an = [], fr = {}, prv = [], prvOk = true;
   try {
     [cons, ist, an] = await Promise.all([
       q(sb.from('consensi').select('id,intervento,medico,data,firmato_il,firmato_da_nome').eq('paziente_id', id).order('firmato_il', { ascending: false })),
@@ -1223,6 +1266,7 @@ async function tabDocumenti(pz) {
       q(sb.from('anamnesi').select('scheda').eq('paziente_id', id))
     ]);
   } catch (e) { $('#tc').innerHTML = '<p class="warn">Documenti non disponibili: esegui l\'aggiornamento del database. ' + esc(e.message) + '</p>'; return; }
+  try { prv = await q(sb.from('consensi_privacy').select('id,versione,firmato_il,firmato_da_nome,scelte').eq('paziente_id', id).order('firmato_il', { ascending: false })); } catch (e) { prvOk = false; }
   fr = await firmeCarica(id);
   const sc = (an[0] || {}).scheda || {};
   $('#tc').innerHTML = `<h3 style="margin-top:0">Scheda anagrafica / ricovero</h3>
@@ -1231,6 +1275,9 @@ async function tabDocumenti(pz) {
       <div class="dca">${can('pazienti', true) ? `<a class="t" href="#/pform/${id}">Modifica</a>` : ''}<a class="t" href="#/firma/${id}">Firma</a><button class="t" id="dpa">PDF</button></div></div>
     <h3>Scheda anamnestica</h3>
     <a class="card rl" href="#/anam/${id}"><b>Scheda anamnestica</b><div class="m">${sc.agg ? 'Compilata il ' + esc(fData(sc.agg)) : 'Da compilare'}${fr.anam_paz ? ' · <span class="okt">firma paziente</span>' : ''}${fr.anam_med ? ' · <span class="okt">firma medico</span>' : ''}</div></a>
+    <h3>Informativa e consensi privacy</h3>
+    ${!prvOk ? '<p class="warn">Esegui l\'aggiornamento del database per attivare questa sezione.</p>' : prv.length ? prv.map((c, i) => `<a class="card rl" href="#/priv/${c.id}"><b>Informativa privacy${i ? '' : ' · in vigore'}</b><div class="m"><span class="okt">Firmata</span> ${esc(dataOra(c.firmato_il))}${c.firmato_da_nome ? ' · ' + esc(c.firmato_da_nome) : ''}<br>${((c.scelte || {}).cons || []).filter(x => x.v === 'Sì').length} consensi su ${((c.scelte || {}).cons || []).length}</div></a>`).join('') : '<p class="warn" style="margin:6px 0">Informativa privacy non ancora firmata.</p>'}
+    ${mod && prvOk ? `<div class="row"><a class="b" href="#/priv/new/${id}">${prv.length ? '+ Nuova versione (modifica scelte)' : '+ Informativa e consensi privacy'}</a></div>` : ''}
     <h3>Consenso informato</h3>
     ${cons.length ? cons.map(c => `<a class="card rl" href="#/cons/${c.id}"><b>${esc(c.intervento || 'Consenso informato')}</b><div class="m"><span class="okt">Firmato</span> ${esc(dataOra(c.firmato_il))}${c.firmato_da_nome ? ' · ' + esc(c.firmato_da_nome) : ''}</div></a>`).join('') : '<p class="m">Nessun consenso firmato</p>'}
     ${mod ? `<div class="row"><a class="b" href="#/cons/new/${id}">+ Nuovo consenso</a></div>` : ''}
@@ -1432,6 +1479,112 @@ async function consNuovo(pazId) {
   };
 }
 
+/* ---------- INFORMATIVA E CONSENSI PRIVACY (GDPR) ---------- */
+const PRIV_VER = '1.0 · ott. 2026';
+const STUDIO = { nome: 'Studio Proaesthetics Chirurgia Plastica ed Estetica', sede: '', piva: '', email: 'segreteria@proaesthetics.it', tel: '090 2982102', dpo: '', anni: 10 };
+const PRIV_CONS = [
+  ['foto_cartella', 'Immagini cliniche', 'Acconsento alla ripresa e all\'archiviazione, nella mia cartella clinica, di fotografie e video del mio caso (prima, durante e dopo il trattamento), per documentare il percorso di cura.'],
+  ['foto_didattica', 'Uso scientifico e didattico', 'Acconsento all\'utilizzo delle immagini, in forma anonima (senza elementi che rendano riconoscibile il volto), per pubblicazioni scientifiche, congressi e attività didattiche.'],
+  ['foto_promo', 'Uso promozionale', 'Acconsento all\'utilizzo delle immagini, anche con volto riconoscibile, per finalità informative e promozionali dello Studio (sito web e social network).'],
+  ['promemoria', 'Promemoria e comunicazioni di servizio', 'Acconsento a ricevere promemoria degli appuntamenti e comunicazioni di servizio tramite WhatsApp, SMS, telefono o e-mail.'],
+  ['marketing', 'Comunicazioni promozionali', 'Acconsento a ricevere comunicazioni informative e promozionali sui servizi dello Studio.']
+];
+function privTesto() {
+  const S_ = STUDIO, ph = (v, t) => v || `[${t}]`;
+  return [
+    `## Titolare del trattamento\nIl titolare del trattamento è ${S_.nome}, ${ph(S_.sede, 'indirizzo della sede')}, P. IVA ${ph(S_.piva, 'partita IVA')} (di seguito "Studio"). Contatti per la privacy: ${S_.email} · tel. ${S_.tel}.${S_.dpo ? ' Responsabile della protezione dei dati (DPO): ' + S_.dpo + '.' : ''}`,
+    `## Quali dati trattiamo\n- dati anagrafici e di contatto (nome, data e luogo di nascita, codice fiscale, indirizzo, telefono, e-mail);\n- dati relativi alla salute: anamnesi, esami e referti, diagnosi, interventi, terapie, immagini cliniche (fotografie e video), consensi e documenti firmati;\n- dati amministrativi e fiscali (preventivi, pagamenti, fatture).`,
+    `## Perché li trattiamo e su quale base\n- Diagnosi, cura e prestazioni sanitarie richieste, tenuta della cartella clinica, gestione degli appuntamenti: il trattamento è necessario per erogare le cure e per eseguire il contratto con Lei (art. 6.1.b e art. 9.2.h GDPR). Per queste finalità non è richiesto un consenso specifico.\n- Obblighi di legge (fiscali, sanitari, tracciabilità di dispositivi medici e impianti): art. 6.1.c GDPR.\n- Difesa di un diritto dello Studio in sede giudiziaria: art. 9.2.f GDPR.\n- Finalità facoltative indicate nella sezione "Consensi" (immagini per uso didattico o promozionale, promemoria tramite messaggio, comunicazioni promozionali): solo con il Suo consenso (art. 6.1.a e 9.2.a GDPR), che può revocare in ogni momento.`,
+    `## A chi possiamo comunicarli\nAl personale dello Studio autorizzato e vincolato al segreto professionale; ai medici e agli anestesisti che partecipano alla cura; alle strutture sanitarie in cui si svolge l'intervento; a laboratori di analisi e di anatomia patologica; a fornitori di servizi informatici (archiviazione sicura dei dati), nominati responsabili del trattamento; a consulenti fiscali e assicurativi; alle autorità, quando previsto dalla legge. I dati sulla salute non vengono diffusi. Non li trasferiamo fuori dallo Spazio Economico Europeo se non con le garanzie previste dagli artt. 44 e seguenti del GDPR.`,
+    `## Per quanto tempo li conserviamo\nLa documentazione clinica è conservata per il tempo previsto dalle norme sanitarie e comunque per almeno ${S_.anni} anni dall'ultima prestazione; i documenti fiscali per ${S_.anni} anni. Le immagini e i dati trattati per le finalità facoltative sono conservati fino alla revoca del consenso. Trascorsi i termini, i dati vengono cancellati o resi anonimi.`,
+    `## I Suoi diritti\nPuò chiederci in ogni momento l'accesso ai Suoi dati, la rettifica, la cancellazione (nei limiti degli obblighi di conservazione), la limitazione, la portabilità e l'opposizione al trattamento (artt. 15-22 GDPR), e revocare i consensi facoltativi, scrivendo a ${S_.email}. La revoca non pregiudica i trattamenti già effettuati. Ha inoltre diritto di proporre reclamo al Garante per la protezione dei dati personali (www.garanteprivacy.it).`,
+    `## Conferimento dei dati\nIl conferimento dei dati necessari alla cura è indispensabile: senza di essi non possiamo eseguire la prestazione. I consensi facoltativi sono liberi: il rifiuto non incide in alcun modo sulle cure. Non è svolto alcun processo decisionale automatizzato né profilazione.`
+  ].join('\n\n');
+}
+function privBlocchi(testo) {
+  return String(testo || '').split('\n\n').map(b => {
+    const r = b.split('\n'), t = r.shift(), li = r.filter(x => x.startsWith('- ')), pa = r.filter(x => !x.startsWith('- '));
+    return `<h4>${esc(t.replace(/^## /, ''))}</h4>${pa.map(x => `<p>${esc(x)}</p>`).join('')}${li.length ? `<ul>${li.map(x => `<li>${esc(x.slice(2))}</li>`).join('')}</ul>` : ''}`;
+  }).join('');
+}
+function privHtml(pz, c) {
+  const sc = c.scelte || {}, rapp = sc.firmatario === 'Legale rappresentante';
+  return `<div class="rel cons priv">${docHd()}<h2>INFORMATIVA E CONSENSI PRIVACY</h2><p class="s" style="margin:-4px 0 6px">ai sensi degli artt. 13-14 del Regolamento (UE) 2016/679 – GDPR · versione ${esc(c.versione || PRIV_VER)}</p>
+    ${docMeta(pz, `<b>Data:</b> ${esc(fData(c.firmato_il || new Date().toISOString()))}`)}
+    ${privBlocchi(c.testo)}
+    <div style="page-break-before:always"><h4>Consensi</h4>
+    <table class="pc">${(sc.cons || []).map(x => `<tr><td>${esc(x.t)}</td><td class="sn">${x.v === 'Sì' ? '☒' : '☐'} Sì<br>${x.v === 'No' ? '☒' : '☐'} No</td></tr>`).join('')}</table>
+    <p class="dich">☒ Dichiaro di aver ricevuto, letto e compreso l'informativa sul trattamento dei dati personali.${rapp ? `<br>Firma resa in qualità di legale rappresentante / tutore: ${esc(sc.rappresentante || '')}, per conto di ${esc(pz.nome)} ${esc(pz.cognome)}.` : ''}</p>
+    <div class="fir2"><div>Luogo: ${esc(sc.luogo || 'Messina')}<br>Data: ${esc(fData(c.firmato_il || new Date().toISOString()))}</div>
+      <div class="sg"><div class="im">${c.firma ? `<img src="${esc(c.firma)}" alt="">` : ''}</div><div class="s">Firma ${rapp ? 'del legale rappresentante' : 'del paziente'}</div></div></div>
+    ${c.firmato_il ? `<div class="aud">Firma elettronica apposta il ${esc(dataOra(c.firmato_il))} · registrata da ${esc(c.firmato_da_nome || '—')} · impronta del documento ${esc((c.impronta || '').slice(0, 24))}</div>` : ''}</div>${docFt()}</div>`;
+}
+VISTE.priv = async (id, pazId) => {
+  if (id === 'new') return privNuovo(pazId);
+  const c = (await q(sb.from('consensi_privacy').select('*').eq('id', id)))[0];
+  if (!c) return schermo({ titolo: 'Informativa privacy', back: true, body: '<p>Documento non trovato</p>' });
+  const pz = S.pazienti.find(x => x.id === c.paziente_id);
+  if (!pz) return schermo({ titolo: 'Informativa privacy', back: true, body: '<p>Paziente non trovato</p>' });
+  const sc = c.scelte || {};
+  schermo({
+    titolo: 'Informativa privacy', back: true,
+    body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b></p>
+      <div class="okb">✓ Firmata il ${esc(dataOra(c.firmato_il))}<br><small>registrata da ${esc(c.firmato_da_nome || '—')} · documento non modificabile · versione ${esc(c.versione)}</small></div>
+      <div class="cprev priv">${privBlocchi(c.testo)}</div>
+      <h3>Consensi</h3>
+      ${(sc.cons || []).map(x => `<div class="pcs"><span>${esc(x.t)}</span><b class="${x.v === 'Sì' ? 'okt' : 'no'}">${esc(x.v)}</b></div>`).join('')}
+      <div class="sigimg"><img src="${esc(c.firma)}" alt="Firma"><small>${sc.firmatario === 'Legale rappresentante' ? 'Legale rappresentante: ' + esc(sc.rappresentante || '') + ' · ' : ''}${esc(sc.luogo || '')}, ${esc(fData(c.firmato_il))}</small></div>
+      <p class="m" style="word-break:break-all">Impronta SHA-256: ${esc(c.impronta)}</p>
+      <div class="row"><button class="b" id="pdfp">PDF / Stampa</button>${can('eliminazione', true) ? '<button class="b d" id="del">Elimina</button>' : ''}</div>`
+  });
+  const stp = () => stampaDoc(privHtml(pz, c), `Privacy ${pz.cognome} ${pz.nome}`);
+  $('#pdfp').onclick = stp;
+  const del = $('#del');
+  if (del) del.onclick = () => conferma('Eliminare il documento?', 'Il documento firmato verrà cancellato. Non si può annullare.', () => ok(async () => {
+    await q(sb.from('consensi_privacy').delete().eq('id', id)); log('elimina_privacy', pz.id); indietro();
+  }));
+  if (window._stampaPriv === id) { window._stampaPriv = null; setTimeout(stp, 300); }
+};
+async function privNuovo(pazId) {
+  const pz = S.pazienti.find(x => x.id === pazId);
+  if (!pz || !can('clinica', true)) return go('#/pazienti');
+  const testo = privTesto();
+  schermo({
+    titolo: 'Informativa privacy', back: true,
+    body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b>${pz.data_nascita ? ' · nato/a il ' + esc(fData(pz.data_nascita)) : ''}</p>
+    <form id="f"><h3>Informativa</h3><div class="cprev priv scr">${privBlocchi(testo)}</div>
+      <h3>Consensi</h3><p class="m" style="margin-top:0">Rispondere a tutte le voci. I consensi facoltativi non condizionano le cure.</p>
+      ${PRIV_CONS.map(([k, tit, t]) => `<div class="pcq"><b>${esc(tit)}</b><p>${esc(t)}</p>${sino('c_' + k, '')}</div>`).join('')}
+      <label class="chk"><input type="checkbox" name="pv">Dichiaro di aver ricevuto, letto e compreso l'informativa sul trattamento dei dati personali.</label>
+      <h3>Chi firma</h3><label class="f">${scelta('firm', ['Paziente', 'Legale rappresentante'], 'Paziente')}</label>
+      <div id="rp" hidden>${campo('Nome e cognome del legale rappresentante / tutore', 'rapp', '')}</div>
+      <div class="grid2">${campo('Luogo', 'luogo', 'Messina')}</div>
+      <h3>Firma</h3>${sigHtml('sg')}
+      <div class="row"><button class="b" id="sv" disabled>Salva e stampa PDF</button></div>
+      <p class="m">Dopo il salvataggio il documento non è più modificabile. Per cambiare una scelta o revocarla si firma una nuova informativa: vale l'ultima. Registra data, ora e utente.</p></form>`
+  });
+  const pad = padFirma($('#sg')), f = $('#f');
+  $('#sgc').onclick = () => pad.pulisci();
+  const agg = () => {
+    const d = fobj(f), rapp = d.firm === 'Legale rappresentante';
+    $('#rp').hidden = !rapp;
+    $('#sv').disabled = !(d.pv && pad.ha() && PRIV_CONS.every(([k]) => d['c_' + k]) && (!rapp || (d.rapp || '').trim()));
+  };
+  pad.su(agg); f.addEventListener('input', agg); f.addEventListener('change', agg); agg();
+  f.onsubmit = e => {
+    e.preventDefault();
+    ok(async () => {
+      const d = fobj(f), firma = pad.dati();
+      const scelte = { presa_visione: true, firmatario: d.firm, rappresentante: d.firm === 'Legale rappresentante' ? d.rapp.trim() : '', luogo: (d.luogo || '').trim() || 'Messina', cons: PRIV_CONS.map(([k, , t]) => ({ k, t, v: d['c_' + k] })) };
+      const impronta = await sha256(`${testo}|${JSON.stringify(scelte)}|${firma}|${pz.id}`);
+      const r = await q(sb.from('consensi_privacy').insert({ paziente_id: pazId, versione: PRIV_VER, scelte, testo, firma, impronta, firmato_da_nome: me.nome || me.username }).select().single());
+      S.pazienti = await q(sb.from('pazienti').select('*').order('cognome').order('nome'));
+      log('firma_privacy', pazId);
+      window._stampaPriv = r.id; history.replaceState(null, '', `#/priv/${r.id}`); render();
+    });
+  };
+}
+
 /* ---------- ISTRUZIONI POST-OPERATORIE ---------- */
 function istrHtml(pz, i) {
   const b = (v, pt) => v !== null && v !== undefined && String(v).trim() !== '' ? `<u>${esc(v)}</u>` : pt;
@@ -1514,12 +1667,42 @@ VISTE.istr = async (id, pazId) => {
 };
 
 /* ---------- avvio e blocco per inattività ---------- */
-let inattivo;
+const BLOCCO_MIN = 5, USCITA_MIN = 30;
+let tBlocco, tUscita, nascostoDa = 0;
 function resetInattivo() {
-  clearTimeout(inattivo);
-  if (me) inattivo = setTimeout(() => { if (me) { esci().then(() => vistaLogin('Sessione chiusa per inattività.')); } }, 30 * 60 * 1000);
+  clearTimeout(tBlocco); clearTimeout(tUscita);
+  if (!me || document.getElementById('lock')) return;
+  if (BLOCCO_ATTIVO) tBlocco = setTimeout(bloccaSchermo, BLOCCO_MIN * 60000);
+  tUscita = setTimeout(() => { if (me) esci().then(() => vistaLogin('Sessione chiusa per inattività.')); }, USCITA_MIN * 60000);
+}
+function bloccaSchermo() {
+  if (!me || document.getElementById('lock')) return;
+  const d = document.createElement('div'); d.id = 'lock';
+  d.innerHTML = `<div class="login"><img src="${LOGO}" alt=""><h1>PROAESTHETICS</h1><p class="sub">Schermata bloccata</p><div class="gl"></div>
+    <form id="lk"><label class="f">Password di ${esc(me.nome || me.username)}<input name="p" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="lke"></div><button class="b" style="width:100%;margin-top:6px">Sblocca</button></form>
+    <button type="button" class="t" id="lx" style="margin-top:14px">Esci</button></div>`;
+  document.body.appendChild(d);
+  $('#lx').onclick = () => { d.remove(); esci(); };
+  $('#lk').onsubmit = async e => {
+    e.preventDefault();
+    try {
+      // verifica la password senza toccare la sessione in corso (resta valida la 2FA)
+      const r = await fetch(`${CFG.SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST', headers: { apikey: CFG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: `${me.username}@${DOMINIO}`, password: fobj(e.target).p })
+      });
+      if (!r.ok) throw new Error('Password errata.');
+      d.remove(); resetInattivo();
+    } catch (err) { $('#lke').textContent = err.message; }
+  };
+  setTimeout(() => { const i = d.querySelector('input'); if (i) i.focus(); }, 50);
 }
 ['click', 'keydown', 'touchstart', 'scroll'].forEach(ev => window.addEventListener(ev, resetInattivo, { passive: true }));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) nascostoDa = Date.now();
+  else if (BLOCCO_ATTIVO && me && nascostoDa && Date.now() - nascostoDa > BLOCCO_MIN * 60000) bloccaSchermo();
+});
 
 (async function avvio() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
