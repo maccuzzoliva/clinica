@@ -107,7 +107,7 @@ function schermo({ titolo, back = false, azioni = '', nav = null, body }) {
     ${me.ruolo === 'admin' ? `<a href="#/utenti" class="${nav === 'utenti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.8a3.4 3.4 0 010 6.4M18.5 14.8c1.8.7 2.8 2.3 3 4.7"/></svg></b>Utenti</a>` : ''}
     <a href="#/impostazioni" class="${nav === 'impostazioni' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></b>Impostaz.</a></div></nav>` : '';
   $('#app').innerHTML = `<header class="top">${back ? '<button class="ic" id="bk" aria-label="Indietro">←</button>' : '<img class="logo" src="' + LOGO + '" alt="">'}
-    <h1>${esc(titolo)}</h1><div>${azioni}</div></header><main>${body}</main>${navi}`;
+    <h1>${esc(titolo)}</h1><span class="vtag">${APP_VERSIONE}</span><div>${azioni}</div></header><main>${body}</main>${navi}`;
   if (back) $('#bk').onclick = indietro;
   if (typeof aggiornaBadge === 'function') aggiornaBadge();
   const e = $('#esci'); if (e) e.onclick = () => conferma('Uscire?', 'Dovrai rifare l\'accesso.', esci);
@@ -187,7 +187,7 @@ async function entra() {
 }
 
 async function esci() {
-  me = null; S.pazienti = []; S.appuntamenti = []; S.listino = []; S.utenti = []; S.chat = { utenti: [], msgs: [], letti: {} };
+  me = null; _visti = null; S.pazienti = []; S.appuntamenti = []; S.listino = []; S.utenti = []; S.chat = { utenti: [], msgs: [], letti: {} };
   try { await sb.auth.signOut(); } catch (_) { /* ignora */ }
   location.hash = '';
   vistaLogin();
@@ -253,6 +253,37 @@ function aggiornaBadge() {
   const n = me && can('chat') ? chatTotNuovi() : 0;
   document.querySelectorAll('.chbd').forEach(e => { e.textContent = n > 99 ? '99+' : n; e.hidden = !n; });
 }
+/* suono di notifica chat (funziona ad app aperta; il browser lo sblocca al primo tocco) */
+let _ac = null, _visti = null;
+const suonoOn = () => { try { return localStorage.getItem('suonoChat') !== '0'; } catch (_) { return true; } };
+['click', 'touchstart', 'keydown'].forEach(ev => window.addEventListener(ev, () => {
+  try { if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)(); if (_ac.state === 'suspended') _ac.resume(); } catch (_) { }
+}, { passive: true }));
+function suonoNotifica() {
+  if (!_ac || !suonoOn()) return;
+  try {
+    const t = _ac.currentTime;
+    [[880, 0], [1174, 0.15]].forEach(([f, d]) => {
+      const o = _ac.createOscillator(), g = _ac.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.3, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.4);
+      o.connect(g); g.connect(_ac.destination); o.start(t + d); o.stop(t + d + 0.45);
+    });
+  } catch (_) { }
+}
+/* banner in alto per un messaggio nuovo (tocco = apre la chat) */
+function bannerChat(m) {
+  const k = chatKey(m), h = location.hash.replace(/^#\//, '');
+  if (!document.hidden && h === 'conv/' + k) return;   // sei già nella conversazione
+  const u = S.chat.utenti.find(x => x.id === m.mittente);
+  const chi = m.mittente_nome || (u ? nomeUt(u) : 'Chat');
+  let b = document.getElementById('bnchat'); if (b) b.remove();
+  b = document.createElement('div'); b.id = 'bnchat';
+  b.innerHTML = `<b>NUOVO MESSAGGIO</b><div><strong>${esc(chi)}</strong>${m.destinatario == null ? ' · Studio' : ''}</div><div class="t">${esc(String(m.testo || '').slice(0, 90))}</div>`;
+  b.onclick = () => { b.remove(); location.hash = '#/conv/' + k; };
+  document.body.appendChild(b);
+  setTimeout(() => { if (b.parentNode) b.remove(); }, 6000);
+}
 async function chatCarica() {
   if (!me || !can('chat')) return;
   const [u, m, l] = await Promise.all([
@@ -263,6 +294,9 @@ async function chatCarica() {
   S.chat.utenti = (u || []).filter(x => x.id !== me.id);
   S.chat.msgs = (m || []).slice().sort((x, y) => tms(x.creato_il) - tms(y.creato_il));
   S.chat.letti = Object.fromEntries((l || []).map(x => [x.chat, x.ultimo]));
+  const nuovi = S.chat.msgs.filter(x => x.mittente !== me.id && !(_visti && _visti.has(x.id)));
+  if (_visti && nuovi.length) { suonoNotifica(); bannerChat(nuovi[nuovi.length - 1]); }
+  _visti = new Set(S.chat.msgs.map(x => x.id));
   aggiornaBadge();
 }
 async function chatLetto(k) {
@@ -758,6 +792,7 @@ VISTE.agenda = async () => {
   schermo({
     titolo: 'Agenda', nav: 'agenda',
     body: `<div class="chips seg" id="flt">${['Oggi', 'Prossimi', 'Tutti'].map(o => `<label><input type="radio" name="f" value="${o}" ${!agGiorno && o === agFiltro ? 'checked' : ''}>${o}</label>`).join('')}</div>
+      <div class="mese" id="mese"></div>
       <div class="wk"><button type="button" class="wn" id="wp" aria-label="Settimana precedente">‹</button><div id="wkd" class="wkd"></div><button type="button" class="wn" id="wnx" aria-label="Settimana successiva">›</button></div>
       <p class="m" id="sub" style="margin:4px 0 10px"></p>
       <div class="list" id="lista"></div>${can('agenda', true) ? '<button class="fab" id="nuovo" aria-label="Nuovo appuntamento">+</button>' : ''}`
@@ -766,6 +801,11 @@ VISTE.agenda = async () => {
   const disegna = () => {
     const oggi = oggiISO();
     const lun = new Date(); lun.setHours(12, 0, 0, 0); lun.setDate(lun.getDate() - ((lun.getDay() + 6) % 7) + agSett * 7);
+    const dom = new Date(lun); dom.setDate(lun.getDate() + 6);
+    const mN = (d, lungo) => d.toLocaleDateString('it-IT', { month: lungo ? 'long' : 'short' }).replace('.', '');
+    const cap = t => t[0].toUpperCase() + t.slice(1);
+    $('#mese').textContent = lun.getMonth() === dom.getMonth() ? `${cap(mN(lun, true))} ${lun.getFullYear()}`
+      : lun.getFullYear() === dom.getFullYear() ? `${cap(mN(lun))} – ${cap(mN(dom))} ${dom.getFullYear()}` : `${cap(mN(lun))} ${lun.getFullYear()} – ${cap(mN(dom))} ${dom.getFullYear()}`;
     const conta = {}; S.appuntamenti.forEach(x => { if (x.stato !== 'Annullato') { const k = isoData(new Date(x.inizio)); conta[k] = (conta[k] || 0) + 1; } });
     $('#wkd').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => { const d = new Date(lun); d.setDate(lun.getDate() + i); const k = isoData(d);
       return `<button type="button" class="dy ${k === agGiorno ? 'on' : ''} ${k === oggi ? 'oggi' : ''}" data-d="${k}"><span>${GG[d.getDay()]}</span><b>${d.getDate()}</b><i class="${conta[k] ? 'p' : ''}"></i></button>`; }).join('');
@@ -1711,10 +1751,14 @@ VISTE.impostazioni = async () => {
       <label class="sw"><input type="checkbox" id="tbl" ${bloccoOn() ? 'checked' : ''} aria-label="Blocco schermo"><span></span></label></div>
       <div id="blm" ${bloccoOn() ? '' : 'hidden'}><div class="s" style="margin-top:12px"><b>Blocca dopo</b></div>
       <div class="chips seg" id="mins">${MIN.map(x => `<button type="button" class="${x === m ? 'on' : ''}" data-m="${x}">${x} min</button>`).join('')}</div></div></div>
+    ${can('chat') ? `<div class="cardi"><div class="r"><div><b>Suono notifiche chat</b><div class="s">Un suono quando arriva un nuovo messaggio (app aperta, su questo dispositivo)</div></div>
+      <label class="sw"><input type="checkbox" id="tsn" ${suonoOn() ? 'checked' : ''} aria-label="Suono chat"><span></span></label></div></div>` : ''}
     <div class="k">Sessione</div><button class="b d" id="lgo" style="width:100%">Logout</button>
     <p class="m">La sessione si chiude comunque dopo ${USCITA_MIN} minuti senza usare l'app.</p><p class="m" style="text-align:center"><small>Versione ${APP_VERSIONE}</small></p>`
   });
   $('#lgo').onclick = () => conferma('Uscire?', 'Dovrai rifare l\'accesso.', esci);
+  const tsn = $('#tsn');
+  if (tsn) tsn.onchange = () => { try { localStorage.setItem('suonoChat', tsn.checked ? '1' : '0'); } catch (_) { } if (tsn.checked) suonoNotifica(); };
   const bl = $('#tbl'), mins = $('#mins');
   bl.onchange = () => ok(async () => {
     const v = bl.checked;
