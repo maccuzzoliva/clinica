@@ -10,7 +10,7 @@ const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY,
 const DOMINIO = 'clinica.local';
 const MODULI = [
   ['pazienti', 'Anagrafica pazienti'], ['clinica', 'Anamnesi e note cliniche'], ['foto', 'Foto prima/dopo'],
-  ['agenda', 'Agenda'], ['listino', 'Listino'], ['conti', 'Preventivi e pagamenti'], ['magazzino', 'Magazzino e impianti'], ['eliminazione', 'Eliminare dati']
+  ['agenda', 'Agenda'], ['chat', 'Chat'], ['listino', 'Listino'], ['conti', 'Preventivi e pagamenti'], ['magazzino', 'Magazzino e impianti'], ['eliminazione', 'Eliminare dati']
 ];
 
 /* ---------- utilità ---------- */
@@ -88,19 +88,24 @@ const inizPaz = p => `${(p.cognome || '')[0] || ''}${(p.nome || '')[0] || ''}`.t
 const medicoBreve = m => (m.includes('Delia') && m.includes('Micieli')) ? 'Entrambi' : m;
 const kv = (e, v) => `<div class="kv"><span>${esc(e)}</span><span>${v}</span></div>`;
 
-const MFA_ATTIVA = false, BLOCCO_ATTIVO = false;  // 2FA e blocco schermo: da attivare in seguito
-const NAV_MAP = { pazienti: 'pazienti', paziente: 'pazienti', pform: 'pazienti', rel: 'pazienti', prev: 'pazienti', impianto: 'pazienti', anam: 'pazienti', cons: 'pazienti', priv: 'pazienti', istr: 'pazienti', firma: 'pazienti', app: 'agenda', agenda: 'agenda', chat: 'chat', conv: 'chat', magazzino: 'magazzino', articolo: 'magazzino', listino: 'listino', voce: 'listino', utenti: 'utenti', utente: 'utenti' };
+/* 2FA e blocco schermo: li sceglie ogni utente da Impostazioni (salvati nel suo profilo) */
+const APP_VERSIONE = 'v19';
+const MFA_DISPONIBILE = false;  // 2FA: sospesa per ora (il codice resta pronto)
+const mfaOn = () => !!(me && me.mfa_attiva);
+const bloccoOn = () => !!(me && me.blocco_attivo);
+const bloccoMin = () => Math.min(60, Math.max(1, +(me && me.blocco_min) || 5));
+const NAV_MAP = { pazienti: 'pazienti', paziente: 'pazienti', pform: 'pazienti', rel: 'pazienti', prev: 'pazienti', impianto: 'pazienti', anam: 'pazienti', cons: 'pazienti', priv: 'pazienti', istr: 'pazienti', firma: 'pazienti', app: 'agenda', agenda: 'agenda', chat: 'chat', conv: 'chat', magazzino: 'magazzino', articolo: 'magazzino', listino: 'listino', voce: 'listino', utenti: 'utenti', utente: 'utenti', impostazioni: 'impostazioni' };
 const navDaRotta = () => NAV_MAP[(location.hash.replace(/^#\//, '') || 'pazienti').split('/')[0]] || 'pazienti';
 function schermo({ titolo, back = false, azioni = '', nav = null, body }) {
   nav = nav || navDaRotta();
   const navi = nav ? `<nav class="bar"><div>
-    <a href="#/pazienti" class="${nav === 'pazienti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.8a3.4 3.4 0 010 6.4M18.5 14.8c1.8.7 2.8 2.3 3 4.7"/></svg></b>Pazienti</a>
+    <a href="#/pazienti" class="${nav === 'pazienti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.8-4 4-6 7.5-6s6.7 2 7.5 6"/></svg></b>Pazienti</a>
     ${can('agenda') ? `<a href="#/agenda" class="${nav === 'agenda' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></b>Agenda</a>` : ''}
-    <a href="#/chat" class="${nav === 'chat' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg><i class="chbd" hidden></i></b>Chat</a>
+    ${can('chat') ? `<a href="#/chat" class="${nav === 'chat' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg><i class="chbd" hidden></i></b>Chat</a>` : ''}
     ${can('magazzino') ? `<a href="#/magazzino" class="${nav === 'magazzino' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5L12 4l8.5 4.5v8L12 21l-8.5-4.5z"/><path d="M3.5 8.5L12 13l8.5-4.5M12 13v8"/></svg></b>Magazzino</a>` : ''}
     ${can('listino') ? `<a href="#/listino" class="${nav === 'listino' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/></svg></b>Listino</a>` : ''}
-    ${me.ruolo === 'admin' ? `<a href="#/utenti" class="${nav === 'utenti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></b>Utenti</a>` : ''}
-    <button id="esci"><b style="display:block"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4M15 8l4 4-4 4M19 12H9"/></svg></b>Esci</button></div></nav>` : '';
+    ${me.ruolo === 'admin' ? `<a href="#/utenti" class="${nav === 'utenti' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.8a3.4 3.4 0 010 6.4M18.5 14.8c1.8.7 2.8 2.3 3 4.7"/></svg></b>Utenti</a>` : ''}
+    <a href="#/impostazioni" class="${nav === 'impostazioni' ? 'on' : ''}"><b><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></b>Impostaz.</a></div></nav>` : '';
   $('#app').innerHTML = `<header class="top">${back ? '<button class="ic" id="bk" aria-label="Indietro">←</button>' : '<img class="logo" src="' + LOGO + '" alt="">'}
     <h1>${esc(titolo)}</h1><div>${azioni}</div></header><main>${body}</main>${navi}`;
   if (back) $('#bk').onclick = indietro;
@@ -116,7 +121,7 @@ function vistaLogin(msg = '') {
       <label class="f">Nome utente<input name="u" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
       <label class="f">Password<input name="p" type="password" autocomplete="current-password" required></label>
       <div class="err" id="le">${esc(msg)}</div>
-      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>v18</small></p></div>`;
+      <button class="b" style="width:100%;margin-top:6px">Accedi</button></form><p class="m" style="margin-top:28px">Accesso riservato al personale autorizzato.<br>I dati dei pazienti sono protetti.<br><small>${APP_VERSIONE}</small></p></div>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const d = fobj(e.target);
@@ -168,11 +173,13 @@ async function vistaMfa(giaAttiva) {
 async function entra() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return vistaLogin();
-  const { data: aal } = MFA_ATTIVA ? await sb.auth.mfa.getAuthenticatorAssuranceLevel() : { data: null };
-  if (MFA_ATTIVA && aal && aal.currentLevel !== 'aal2') return vistaMfa(aal.nextLevel === 'aal2');
   const p = await q(sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle());
   if (!p) { await esci(); return vistaLogin('Profilo non trovato: contatta l\'amministratore.'); }
   if (!p.attivo) { await esci(); return vistaLogin('Utenza disattivata. Contatta l\'amministratore.'); }
+  if (MFA_DISPONIBILE && p.mfa_attiva) {
+    const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.currentLevel !== 'aal2') return vistaMfa(aal.nextLevel === 'aal2');
+  }
   me = p;
   await caricaTutto();
   if (!location.hash || location.hash === '#/') location.hash = '#/pazienti';
@@ -243,11 +250,11 @@ const chatKey = m => m.destinatario == null ? 'studio' : (m.mittente === me.id ?
 const chatNonLetti = k => S.chat.msgs.filter(m => m.mittente !== me.id && chatKey(m) === k && (!S.chat.letti[k] || tms(m.creato_il) > tms(S.chat.letti[k]))).length;
 const chatTotNuovi = () => ['studio', ...S.chat.utenti.map(u => u.id)].reduce((s, k) => s + chatNonLetti(k), 0);
 function aggiornaBadge() {
-  const n = me ? chatTotNuovi() : 0;
+  const n = me && can('chat') ? chatTotNuovi() : 0;
   document.querySelectorAll('.chbd').forEach(e => { e.textContent = n > 99 ? '99+' : n; e.hidden = !n; });
 }
 async function chatCarica() {
-  if (!me) return;
+  if (!me || !can('chat')) return;
   const [u, m, l] = await Promise.all([
     q(sb.rpc('utenti_chat')),
     q(sb.from('chat_messaggi').select('*').order('creato_il', { ascending: false }).limit(500)),
@@ -270,6 +277,7 @@ const nomeUt = u => (u.nome || u.username || '').trim();
 const inizUt = u => nomeUt(u).split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('');
 
 VISTE.chat = async () => {
+  if (!can('chat')) return go('#/pazienti');
   schermo({ titolo: 'Chat', nav: 'chat', body: '<div class="lock">🔒 Conversazioni private tra gli utenti dello studio</div><div id="cl"></div>' });
   const disegna = () => {
     const riga = (k, nome, ini, cls) => {
@@ -285,6 +293,7 @@ VISTE.chat = async () => {
 };
 
 VISTE.conv = async k => {
+  if (!can('chat')) return go('#/pazienti');
   clearInterval(chatT);
   if (!S.chat.utenti.length && k !== 'studio') { try { await chatCarica(); } catch (_) { } }
   const ut = S.chat.utenti.find(u => u.id === k);
@@ -1084,7 +1093,7 @@ VISTE.utente = async id => {
   if (me.ruolo !== 'admin') return go('#/pazienti');
   const nuovo = id === 'new', u = nuovo ? { ruolo: 'staff', attivo: true, permessi: {} } : S.utenti.find(x => x.id === id) || {};
   const io = !nuovo && u.id === me.id;
-  const livello = k => (u.permessi || {})[k] || (['pazienti', 'agenda', 'listino'].includes(k) ? 'view' : 'none');
+  const livello = k => (u.permessi || {})[k] || (k === 'chat' ? 'edit' : ['pazienti', 'agenda', 'listino'].includes(k) ? 'view' : 'none');
   schermo({
     titolo: nuovo ? 'Nuovo utente' : `Utente @${u.username}`, back: true,
     body: `<form id="f">${campo('Username (senza spazi)', 'username', u.username, 'text', `${nuovo ? '' : 'disabled'} autocapitalize="none" autocorrect="off"`)}
@@ -1096,7 +1105,7 @@ VISTE.utente = async id => {
         ? scelta('p_' + k, ['No', 'Sì'], livello(k) === 'edit' ? 'Sì' : 'No')
         : scelta('p_' + k, ['Nessuno', 'Lettura', 'Modifica'], { none: 'Nessuno', view: 'Lettura', edit: 'Modifica' }[livello(k)])}</label>`).join('')}</div>
       <div class="row"><button class="b">Salva</button>${!nuovo && !io ? '<button type="button" class="b d" id="del">Elimina utente</button>' : ''}</div>
-      ${!nuovo && MFA_ATTIVA ? '<button type="button" class="b o" id="r2fa" style="width:100%;margin-top:10px">Reimposta 2FA (telefono perso o cambiato)</button>' : ''}
+      ${!nuovo && MFA_DISPONIBILE ? '<button type="button" class="b o" id="r2fa" style="width:100%;margin-top:10px">Reimposta 2FA (telefono perso o cambiato)</button>' : ''}
       <p class="m">Le modifiche ai permessi valgono dal prossimo accesso o aggiornamento dell'altro utente.</p></form>`
   });
   const r2 = $('#r2fa');
@@ -1590,7 +1599,7 @@ function istrHtml(pz, i) {
   const b = (v, pt) => v !== null && v !== undefined && String(v).trim() !== '' ? `<u>${esc(v)}</u>` : pt;
   const dt = d => d ? `<u>${esc(fData(d))}</u>` : '......./......../..........';
   const ti = pz.sesso === 'F' ? 'Sig.ra' : pz.sesso === 'M' ? 'Sig.' : 'Sig./Sig.ra';
-  return `<div class="rel ist">${docHd()}
+  return `<div class="rel ist">${docHd()}<h2>ISTRUZIONI POST-OPERATORIE</h2>
     <p><b>${ti}</b> ${esc(pz.cognome)} ${esc(pz.nome)}</p>
     <p><b>Diagnosi:</b> ${esc(i.diagnosi || '')}</p><p><b>Intervento eseguito:</b> ${esc(i.intervento || '')}</p><p><b>Operatori:</b> ${esc(i.operatori || '')}</p>
     <p class="sp">SI PRESCRIVE:</p>
@@ -1622,6 +1631,10 @@ VISTE.istr = async (id, pazId) => {
     i = { data: oggiISO(), luogo: 'Messina', diagnosi: an.diagnosi || '', intervento: an.tipo_intervento || '', operatori: pz.medici || '', antibiotica: '', prescrizione_extra: '', medicazione_dal: null, medicazione_ogni: null, suture_giorni: null, crema: '', crema_solare: '', controllo_data: null, controllo_ora: '', firma: '' };
   }
   let firma = i.firma || '';
+  // il primo controllo è lo stesso dato dell'appuntamento in agenda
+  const apC = i.appuntamento_id ? S.appuntamenti.find(x => x.id === i.appuntamento_id) : null;
+  if (apC) { const d0 = new Date(apC.inizio); i.controllo_data = isoData(d0); i.controllo_ora = isoOra(d0); }
+  const canAg = can('agenda', true);
   schermo({
     titolo: nuovo ? 'Nuove istruzioni' : 'Istruzioni post-operatorie', back: true,
     body: `<p class="m" style="margin:6px 0 0"><b>${esc(pz.cognome)} ${esc(pz.nome)}</b></p>
@@ -1634,6 +1647,8 @@ VISTE.istr = async (id, pazId) => {
       <div class="grid2">${campo('Medicare ogni (giorni)', 'medicazione_ogni', i.medicazione_ogni ?? '', 'number', 'min="1" inputmode="numeric"')}${campo('Suture: non prima di (giorni)', 'suture_giorni', i.suture_giorni ?? '', 'number', 'min="1" inputmode="numeric"')}</div>
       ${campo('Crema a guarigione avvenuta', 'crema', i.crema)}${campo('Crema solare 50+', 'crema_solare', i.crema_solare)}
       <h3>Primo controllo</h3><div class="grid2">${campo('Data', 'controllo_data', i.controllo_data || '', 'date')}${campo('Ora', 'controllo_ora', i.controllo_ora || '', 'time')}</div>
+      ${canAg ? `<label class="chk"><input type="checkbox" name="crea_app" ${nuovo || i.appuntamento_id ? 'checked' : ''}>Sincronizza con l'agenda (appuntamento "Controllo")</label>
+      <p class="m" style="margin-top:0">${apC ? 'Collegato all\'agenda: se sposti l\'appuntamento, qui data e ora si aggiornano.' : 'Data e ora creano l\'appuntamento in agenda.'}</p>` : ''}
       <h3>Per presa visione (facoltativa)</h3>
       <div class="sigimg" id="sfs" ${firma ? '' : 'hidden'}><img src="${esc(firma)}" alt="Firma"><button type="button" class="t d" id="sfr">Rimuovi firma salvata</button></div>
       ${sigHtml('sg', ' (paziente)')}</fieldset>
@@ -1654,9 +1669,19 @@ VISTE.istr = async (id, pazId) => {
   $('#f').onsubmit = e => {
     e.preventDefault();
     ok(async () => {
-      const rec = leggi();
-      if (nuovo) await q(sb.from('istruzioni_postop').insert({ ...rec, paziente_id: pid, autore_nome: me.nome || me.username }));
+      const rec = leggi(), sync = canAg && fobj($('#f')).crea_app;
+      let iid = id;
+      if (nuovo) { const r = await q(sb.from('istruzioni_postop').insert({ ...rec, paziente_id: pid, autore_nome: me.nome || me.username }).select().single()); iid = r.id; }
       else await q(sb.from('istruzioni_postop').update(rec).eq('id', id));
+      if (sync && rec.controllo_data && rec.controllo_ora) {
+        const ap = { paziente_id: pid, inizio: new Date(`${rec.controllo_data}T${rec.controllo_ora}`).toISOString(), tipo: 'Controllo', trattamento: 'Primo controllo post-operatorio', stato: 'Programmato' };
+        if (apC) await q(sb.from('appuntamenti').update({ inizio: ap.inizio }).eq('id', apC.id));
+        else {
+          const r = await q(sb.from('appuntamenti').insert({ ...ap, durata_min: 30 }).select().single());
+          await q(sb.from('istruzioni_postop').update({ appuntamento_id: r.id }).eq('id', iid));
+        }
+        S.appuntamenti = await q(sb.from('appuntamenti').select('*').order('inizio'));
+      }
       log(nuovo ? 'nuove_istruzioni' : 'modifica_istruzioni', pid); indietro();
     });
   };
@@ -1666,13 +1691,80 @@ VISTE.istr = async (id, pazId) => {
   }));
 };
 
+
+/* ---------- IMPOSTAZIONI (sicurezza personale e logout) ---------- */
+async function salvaSicurezza(mfa, blocco, min) {
+  await q(sb.rpc('imposta_sicurezza', { p_mfa: mfa, p_blocco: blocco, p_min: min }));
+  me.mfa_attiva = mfa; me.blocco_attivo = blocco; me.blocco_min = min;
+  resetInattivo();
+}
+VISTE.impostazioni = async () => {
+  const MIN = [1, 2, 5, 10, 15];
+  const m = bloccoMin();
+  schermo({
+    titolo: 'Impostazioni', nav: 'impostazioni',
+    body: `<div class="k">Account</div><div class="cardi"><b>${esc(me.nome || me.username)}</b><div class="s">@${esc(me.username)} · ${me.ruolo === 'admin' ? 'Amministratore' : 'Operatore'}</div></div>
+    <div class="k">Sicurezza</div>
+    ${MFA_DISPONIBILE ? `    <div class="cardi"><div class="r"><div><b>Verifica in due passaggi (2FA)</b><div class="s">Codice a 6 cifre dall'app di autenticazione a ogni accesso</div></div>
+      <label class="sw"><input type="checkbox" id="t2fa" ${mfaOn() ? 'checked' : ''} aria-label="2FA"><span></span></label></div><div id="mfp"></div></div>` : ''}
+    <div class="cardi"><div class="r"><div><b>Blocco schermo automatico</b><div class="s">Dopo inattività si riprende con la password</div></div>
+      <label class="sw"><input type="checkbox" id="tbl" ${bloccoOn() ? 'checked' : ''} aria-label="Blocco schermo"><span></span></label></div>
+      <div id="blm" ${bloccoOn() ? '' : 'hidden'}><div class="s" style="margin-top:12px"><b>Blocca dopo</b></div>
+      <div class="chips seg" id="mins">${MIN.map(x => `<button type="button" class="${x === m ? 'on' : ''}" data-m="${x}">${x} min</button>`).join('')}</div></div></div>
+    <div class="k">Sessione</div><button class="b d" id="lgo" style="width:100%">Logout</button>
+    <p class="m">La sessione si chiude comunque dopo ${USCITA_MIN} minuti senza usare l'app.</p><p class="m" style="text-align:center"><small>Versione ${APP_VERSIONE}</small></p>`
+  });
+  $('#lgo').onclick = () => conferma('Uscire?', 'Dovrai rifare l\'accesso.', esci);
+  const bl = $('#tbl'), mins = $('#mins');
+  bl.onchange = () => ok(async () => {
+    const v = bl.checked;
+    try { await salvaSicurezza(mfaOn(), v, bloccoMin()); $('#blm').hidden = !v; } catch (e) { bl.checked = !v; throw e; }
+  });
+  mins.onclick = e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    ok(async () => { await salvaSicurezza(mfaOn(), bloccoOn(), +b.dataset.m); mins.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
+  };
+  const t = $('#t2fa');
+  if (t) t.onchange = async () => {
+    if (!t.checked) {
+      t.checked = true;
+      return conferma('Disattivare la 2FA?', 'L\'accesso richiederà solo la password.', () => ok(async () => {
+        const { data } = await sb.auth.mfa.listFactors();
+        for (const f of (data && data.totp) || []) { const r = await sb.auth.mfa.unenroll({ factorId: f.id }); if (r.error) throw new Error(r.error.message); }
+        await salvaSicurezza(false, bloccoOn(), bloccoMin()); VISTE.impostazioni();
+      }));
+    }
+    busy(true);
+    try {
+      const { data: tutti } = await sb.auth.mfa.listFactors();
+      for (const f of (tutti && tutti.all) || []) if (f.status === 'unverified') await sb.auth.mfa.unenroll({ factorId: f.id });
+      const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Studio ' + Date.now() });
+      if (error) throw new Error(error.message);
+      $('#mfp').innerHTML = `<div class="mfpan"><p class="m" style="text-align:left">1. Installa <b>Google Authenticator</b> (o Microsoft Authenticator).<br>2. Inquadra il codice oppure inserisci la chiave a mano.<br>3. Scrivi qui il codice a 6 cifre.</p>
+        <img src="${data.totp.qr_code}" alt="QR" style="width:180px;height:180px;background:#fff;padding:6px;border-radius:8px;margin:8px auto;display:block">
+        <p class="m"><small>Chiave:</small><br><b style="word-break:break-all;user-select:all">${esc(data.totp.secret)}</b></p>
+        <form id="mf"><label class="f">Codice a 6 cifre<input name="c" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required style="text-align:center;font-size:20px;letter-spacing:.3em"></label>
+        <div class="err" id="le"></div><div class="row"><button class="b">Attiva</button><button type="button" class="b o" id="mxa">Annulla</button></div></form></div>`;
+      $('#mxa').onclick = async () => { await sb.auth.mfa.unenroll({ factorId: data.id }).catch(() => { }); VISTE.impostazioni(); };
+      $('#mf').onsubmit = async e => {
+        e.preventDefault(); busy(true);
+        try {
+          const r = await sb.auth.mfa.challengeAndVerify({ factorId: data.id, code: fobj(e.target).c.trim() });
+          if (r.error) throw new Error(/invalid/i.test(r.error.message) ? 'Codice errato o scaduto.' : r.error.message);
+          await salvaSicurezza(true, bloccoOn(), bloccoMin()); VISTE.impostazioni();
+        } catch (err) { $('#le').textContent = err.message; } finally { busy(false); }
+      };
+    } catch (err) { t.checked = false; avviso('Attenzione', err.message || String(err)); } finally { busy(false); }
+  };
+};
+
 /* ---------- avvio e blocco per inattività ---------- */
-const BLOCCO_MIN = 5, USCITA_MIN = 30;
+const USCITA_MIN = 30;
 let tBlocco, tUscita, nascostoDa = 0;
 function resetInattivo() {
   clearTimeout(tBlocco); clearTimeout(tUscita);
   if (!me || document.getElementById('lock')) return;
-  if (BLOCCO_ATTIVO) tBlocco = setTimeout(bloccaSchermo, BLOCCO_MIN * 60000);
+  if (bloccoOn()) tBlocco = setTimeout(bloccaSchermo, bloccoMin() * 60000);
   tUscita = setTimeout(() => { if (me) esci().then(() => vistaLogin('Sessione chiusa per inattività.')); }, USCITA_MIN * 60000);
 }
 function bloccaSchermo() {
@@ -1701,7 +1793,7 @@ function bloccaSchermo() {
 ['click', 'keydown', 'touchstart', 'scroll'].forEach(ev => window.addEventListener(ev, resetInattivo, { passive: true }));
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) nascostoDa = Date.now();
-  else if (BLOCCO_ATTIVO && me && nascostoDa && Date.now() - nascostoDa > BLOCCO_MIN * 60000) bloccaSchermo();
+  else if (bloccoOn() && nascostoDa && Date.now() - nascostoDa > bloccoMin() * 60000) bloccaSchermo();
 });
 
 (async function avvio() {

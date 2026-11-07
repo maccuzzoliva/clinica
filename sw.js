@@ -1,5 +1,5 @@
 // Service worker minimo: salva solo i file dell'app (mai i dati dei pazienti).
-const V = "clinica-v18";
+const V = "clinica-v20";
 const FILES = ["./", "index.html", "style.css?v=18", "app.js?v=18", "config.js", "supabase.js", "manifest.webmanifest", "icons/icon-192.png", "icons/logo-loto.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
